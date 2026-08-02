@@ -1,0 +1,6 @@
+[deploy]
+dockerfilePath = "Dockerfile"
+startCommand = ""
+
+[[services]]
+name = "snipbot"
