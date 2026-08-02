@@ -1,7 +1,6 @@
 FROM drakkarsoftware/octobot:stable
 
-ENV OCTOBOT_PORT=5001
-
 EXPOSE 5001
 
-CMD ["python", "-m", "octobot", "--port", "5001"]
+ENTRYPOINT ["octobot"]
+CMD ["--host", "0.0.0.0", "--port", "5001"]
