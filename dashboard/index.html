@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SniBot — Sniper Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --danger:#ff3c3c;
+  --danger-dim:rgba(255,60,60,.12);
+  --void:#080b10;
+  --surface:#0f1520;
+  --card:#131b2a;
+  --border:#1e2d45;
+  --neon:#39ff14;
+  --neon-dim:rgba(57,255,20,.10);
+  --amber:#e8c84a;
+  --amber-dim:rgba(232,200,74,.1);
+  --steel:#c8d4e8;
+  --muted:#4a6080;
+  --green:#00d68f;
+  --green-dim:rgba(0,214,143,.1);
+  --raj:'Rajdhani',sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'Inter',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--sans);background:var(--void);color:var(--steel);min-height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+/* ── TOP STATUS BAR ── */
+.status-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;height:38px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;
+  flex-shrink:0;
+}
+.status-left{display:flex;align-items:center;gap:20px;}
+.target-lock{
+  display:flex;align-items:center;gap:7px;
+  color:var(--neon);font-weight:500;letter-spacing:.15em;
+}
+.lock-dot{
+  width:7px;height:7px;border-radius:50%;
+  background:var(--neon);box-shadow:0 0 8px var(--neon);
+  animation:blink 1.2s infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.status-mid{display:flex;align-items:center;gap:16px;}
+.stat-chip{
+  padding:3px 10px;border-radius:4px;font-size:10px;letter-spacing:.08em;
+  border:1px solid;white-space:nowrap;
+}
+.chip-red   {color:var(--neon);  border-color:rgba(57,255,20,.35); background:var(--neon-dim);}
+.chip-amber {color:var(--amber);border-color:rgba(232,200,74,.35);background:var(--amber-dim);}
+.chip-green {color:var(--green);border-color:rgba(0,214,143,.35); background:var(--green-dim);}
+.chip-muted {color:var(--muted);border-color:var(--border);background:transparent;}
+.status-right{display:flex;align-items:center;gap:10px;}
+.abort-btn{
+  padding:4px 14px;border-radius:4px;font-size:10px;font-family:var(--mono);
+  letter-spacing:.12em;cursor:pointer;border:1px solid rgba(57,255,20,.5);
+  background:rgba(57,255,20,.08);color:var(--neon);transition:.15s;font-weight:500;
+}
+.abort-btn:hover{background:rgba(57,255,20,.2);}
+.clock-chip{color:var(--muted);letter-spacing:.08em;}
+
+/* ── LAYOUT ── */
+.layout{display:flex;flex:1;overflow:hidden;height:calc(100vh - 38px);}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  width:200px;flex-shrink:0;
+  background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+.brand{
+  padding:18px 16px 16px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+.brand-icon{position:relative;width:36px;height:36px;flex-shrink:0;}
+.brand-icon svg{width:36px;height:36px;}
+.brand-name{
+  font-family:var(--raj);font-size:22px;font-weight:700;
+  color:#fff;letter-spacing:.05em;line-height:1;
+}
+.brand-tagline{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.15em;margin-top:3px;}
+
+nav{padding:14px 10px;flex:1;overflow-y:auto;}
+.nav-section{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.18em;text-transform:uppercase;padding:0 8px;margin:14px 0 6px;}
+.nav-item{
+  display:flex;align-items:center;gap:9px;
+  padding:8px 10px;border-radius:6px;
+  font-size:12.5px;font-family:var(--raj);font-weight:600;letter-spacing:.04em;
+  color:var(--muted);cursor:pointer;transition:.15s;margin-bottom:1px;
+  user-select:none;
+}
+.nav-item:hover{background:rgba(255,255,255,.04);color:var(--steel);}
+.nav-item.active{background:var(--neon-dim);color:var(--neon);border-right:2px solid var(--neon);}
+.nav-item.active .nav-ico{filter:none;}
+.nav-ico{font-size:14px;width:18px;text-align:center;opacity:.7;}
+.nav-item.active .nav-ico{opacity:1;}
+.nav-badge{
+  margin-right:auto;font-family:var(--mono);font-size:9px;
+  padding:2px 6px;border-radius:3px;
+  background:var(--neon-dim);color:var(--neon);border:1px solid rgba(57,255,20,.3);
+}
+
+.sidebar-footer{
+  padding:12px 14px;border-top:1px solid var(--border);
+  font-family:var(--mono);font-size:9px;
+}
+.conn-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+.conn-dot{width:5px;height:5px;border-radius:50%;}
+.conn-label{color:var(--muted);letter-spacing:.06em;}
+.conn-val{color:var(--green);letter-spacing:.06em;}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+/* ── TOPBAR ── */
+.topbar{
+  padding:12px 22px;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.page-title{font-family:var(--raj);font-size:18px;font-weight:700;letter-spacing:.06em;color:#fff;}
+.page-sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px;letter-spacing:.06em;}
+.topbar-actions{display:flex;gap:8px;align-items:center;}
+.btn{
+  padding:7px 16px;border-radius:5px;font-size:12px;
+  font-family:var(--raj);font-weight:600;letter-spacing:.08em;
+  cursor:pointer;border:1px solid;transition:.15s;
+}
+.btn:hover{opacity:.8;}
+.btn-fire{background:var(--neon);color:#fff;border-color:var(--neon);box-shadow:0 0 12px rgba(57,255,20,.25);}
+.btn-standby{background:transparent;color:var(--steel);border-color:var(--border);}
+.btn-amber{background:var(--amber-dim);color:var(--amber);border-color:rgba(232,200,74,.4);}
+
+/* ── CONTENT ── */
+.content{flex:1;overflow-y:auto;padding:18px 22px;display:flex;flex-direction:column;gap:16px;}
+
+/* ── SECTION LABELS ── */
+.section-label{
+  font-family:var(--mono);font-size:10px;color:var(--muted);
+  letter-spacing:.18em;text-transform:uppercase;
+  display:flex;align-items:center;gap:8px;margin-bottom:10px;
+}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ── CARDS ── */
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:8px;padding:16px;
+}
+.card-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:14px;
+}
+.card-title{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;}
+
+/* ── TARGET OVERVIEW ── */
+.grid-overview{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}
+.ov-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:8px;padding:14px 16px;position:relative;overflow:hidden;
+}
+.ov-card::before{
+  content:'';position:absolute;top:0;right:0;
+  width:3px;height:100%;background:var(--border);
+}
+.ov-card.locked::before{background:var(--neon);}
+.ov-card.amber-accent::before{background:var(--amber);}
+.ov-card.green-accent::before{background:var(--green);}
+.ov-label{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;}
+.ov-value{font-family:var(--raj);font-size:26px;font-weight:700;color:#fff;line-height:1;}
+.ov-delta{font-family:var(--mono);font-size:10px;margin-top:6px;}
+.delta-up  {color:var(--green);}
+.delta-down{color:var(--neon);}
+.delta-flat{color:var(--muted);}
+
+/* ── MID GRID ── */
+.grid-mid{display:grid;grid-template-columns:1.5fr 1fr;gap:14px;}
+
+/* ── SNIPES TABLE ── */
+.snipes-table{width:100%;border-collapse:collapse;}
+.snipes-table th{
+  font-family:var(--mono);font-size:9px;color:var(--muted);
+  letter-spacing:.1em;text-transform:uppercase;
+  padding:7px 10px;border-bottom:1px solid var(--border);
+  text-align:left;font-weight:500;
+}
+.snipes-table td{
+  padding:9px 10px;font-family:var(--mono);font-size:11.5px;
+  border-bottom:1px solid rgba(30,45,69,.5);
+}
+.snipes-table tr:last-child td{border-bottom:none;}
+.snipes-table tr:hover td{background:rgba(255,255,255,.02);}
+
+.pair-tag{font-family:var(--raj);font-size:13px;font-weight:700;color:#fff;}
+.side-long {color:var(--green);font-weight:500;}
+.side-short{color:var(--neon);font-weight:500;}
+
+.crosshair-icon{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:18px;height:18px;position:relative;
+}
+.crosshair-icon svg{width:14px;height:14px;}
+
+.status-locked{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:9px;padding:2px 7px;border-radius:3px;
+  background:var(--neon-dim);color:var(--neon);
+  border:1px solid rgba(57,255,20,.3);letter-spacing:.08em;
+}
+.status-tracking{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:9px;padding:2px 7px;border-radius:3px;
+  background:var(--amber-dim);color:var(--amber);
+  border:1px solid rgba(232,200,74,.3);letter-spacing:.08em;
+}
+.status-executed{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:9px;padding:2px 7px;border-radius:3px;
+  background:var(--green-dim);color:var(--green);
+  border:1px solid rgba(0,214,143,.3);letter-spacing:.08em;
+}
+
+.action-btn{
+  padding:3px 10px;border-radius:4px;font-size:10px;
+  font-family:var(--mono);cursor:pointer;border:1px solid;transition:.12s;
+}
+.action-exit{color:var(--neon);border-color:rgba(57,255,20,.4);background:var(--neon-dim);}
+.action-exit:hover{background:rgba(57,255,20,.25);}
+.action-hold{color:var(--amber);border-color:rgba(232,200,74,.4);background:var(--amber-dim);}
+
+/* ── RADAR ── */
+.radar-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.agent-cell{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:7px;padding:12px;
+}
+.agent-name{font-family:var(--raj);font-size:12px;font-weight:700;color:#fff;margin-bottom:2px;}
+.agent-role{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.08em;margin-bottom:9px;}
+.conf-track{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:5px;}
+.conf-fill{height:100%;border-radius:2px;transition:width .8s ease;}
+.agent-verdict{font-family:var(--mono);font-size:10px;display:flex;align-items:center;gap:5px;}
+.vdot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+
+/* ── BOTTOM GRID ── */
+.grid-bottom{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+/* ── MANUAL SNIPE CONSOLE ── */
+.console-form{display:flex;flex-direction:column;gap:10px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.field-label{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.1em;margin-bottom:4px;}
+.field-input{
+  width:100%;background:var(--surface);border:1px solid var(--border);
+  border-radius:5px;padding:7px 10px;
+  font-family:var(--mono);font-size:12px;color:var(--steel);outline:none;
+  transition:.15s;
+}
+.field-input:focus{border-color:var(--amber);}
+.field-select{
+  width:100%;background:var(--surface);border:1px solid var(--border);
+  border-radius:5px;padding:7px 10px;
+  font-family:var(--mono);font-size:12px;color:var(--steel);outline:none;
+  cursor:pointer;
+}
+.fire-row{display:flex;gap:8px;margin-top:4px;}
+.btn-fire-full{
+  flex:1;padding:9px;border-radius:5px;
+  font-family:var(--raj);font-size:14px;font-weight:700;letter-spacing:.1em;
+  cursor:pointer;border:none;
+  background:linear-gradient(135deg,#c0392b,var(--neon));
+  color:#fff;box-shadow:0 0 16px rgba(57,255,20,.3);transition:.15s;
+}
+.btn-fire-full:hover{box-shadow:0 0 24px rgba(57,255,20,.5);}
+.btn-cancel-full{
+  padding:9px 18px;border-radius:5px;
+  font-family:var(--raj);font-size:13px;font-weight:600;
+  cursor:pointer;border:1px solid var(--border);
+  background:transparent;color:var(--muted);transition:.15s;
+}
+
+/* ── SNIPPETS FEED ── */
+.snippets-feed{display:flex;flex-direction:column;gap:7px;max-height:280px;overflow-y:auto;}
+.snippet{
+  padding:9px 12px;border-radius:6px;
+  border-right:3px solid;
+  font-family:var(--mono);font-size:10.5px;line-height:1.6;
+  background:var(--surface);
+}
+.snippet.locked  {border-color:var(--neon);  }
+.snippet.alert   {border-color:var(--amber); }
+.snippet.executed{border-color:var(--green); }
+.snippet.info    {border-color:var(--muted); }
+.snip-meta{font-size:9px;color:var(--muted);margin-bottom:3px;display:flex;gap:8px;}
+.snip-body{color:var(--steel);}
+
+/* ── CHART ── */
+.chart-wrap{height:160px;position:relative;}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(60px);
+  background:var(--card);border:1px solid var(--neon);border-radius:7px;
+  padding:10px 20px;font-family:var(--mono);font-size:11px;color:var(--neon);
+  z-index:1000;transition:transform .3s ease;white-space:nowrap;letter-spacing:.06em;
+  box-shadow:0 4px 24px rgba(57,255,20,.2);
+}
+.toast.show{transform:translateX(-50%) translateY(0);}
+
+  /* ── NEON PHOSPHOR GLOW SYSTEM ── */
+  .lock-dot{
+    background:var(--neon) !important;
+    box-shadow:0 0 6px var(--neon),0 0 12px var(--neon),0 0 24px rgba(57,255,20,.4) !important;
+  }
+  .status-locked{
+    color:var(--neon) !important;
+    border-color:rgba(57,255,20,.45) !important;
+    background:rgba(57,255,20,.07) !important;
+    text-shadow:0 0 8px var(--neon);
+  }
+  .nav-item.active{
+    background:rgba(57,255,20,.08) !important;
+    color:var(--neon) !important;
+    border-right:2px solid var(--neon) !important;
+    text-shadow:0 0 10px rgba(57,255,20,.6);
+  }
+  .target-lock{
+    color:var(--neon) !important;
+    text-shadow:0 0 10px var(--neon),0 0 20px rgba(57,255,20,.5);
+  }
+  .chip-red{
+    color:var(--neon) !important;
+    border-color:rgba(57,255,20,.4) !important;
+    background:rgba(57,255,20,.07) !important;
+    text-shadow:0 0 6px var(--neon);
+  }
+  .abort-btn{
+    border-color:rgba(57,255,20,.5) !important;
+    background:rgba(57,255,20,.07) !important;
+    color:var(--neon) !important;
+    text-shadow:0 0 8px var(--neon);
+  }
+  .abort-btn:hover{
+    background:rgba(57,255,20,.18) !important;
+    box-shadow:0 0 16px rgba(57,255,20,.3);
+  }
+  .ov-card.locked::before{
+    background:var(--neon) !important;
+    box-shadow:2px 0 12px rgba(57,255,20,.5);
+  }
+  .btn-fire{
+    background:var(--neon) !important;
+    color:#050a02 !important;
+    border-color:var(--neon) !important;
+    box-shadow:0 0 14px rgba(57,255,20,.4),0 0 28px rgba(57,255,20,.2) !important;
+    text-shadow:none;
+  }
+  .btn-fire:hover{
+    box-shadow:0 0 22px rgba(57,255,20,.6),0 0 40px rgba(57,255,20,.3) !important;
+  }
+  .btn-fire-full{
+    background:linear-gradient(135deg,#0d5c00,var(--neon)) !important;
+    box-shadow:0 0 18px rgba(57,255,20,.35),0 0 36px rgba(57,255,20,.15) !important;
+    color:#050a02 !important;
+  }
+  .btn-fire-full:hover{
+    box-shadow:0 0 28px rgba(57,255,20,.55),0 0 56px rgba(57,255,20,.25) !important;
+  }
+  .brand-icon svg circle,.brand-icon svg line,.brand-icon svg circle:last-of-type{
+    filter:drop-shadow(0 0 4px #39ff14);
+  }
+  .conn-val{
+    color:var(--neon) !important;
+    text-shadow:0 0 6px rgba(57,255,20,.6);
+  }
+  .delta-up{
+    color:var(--neon) !important;
+    text-shadow:0 0 6px rgba(57,255,20,.4);
+  }
+  .side-long{color:var(--neon) !important;text-shadow:0 0 6px rgba(57,255,20,.4);}
+  .side-short{color:var(--danger) !important;}
+  .delta-down{color:var(--danger) !important;}
+  .action-exit{
+    color:var(--danger) !important;
+    border-color:rgba(255,60,60,.4) !important;
+    background:rgba(255,60,60,.08) !important;
+  }
+  .snippet.locked{border-color:var(--neon) !important;box-shadow:inset 3px 0 12px rgba(57,255,20,.06);}
+  .conf-fill[style*="--red"]{background:var(--neon) !important;}
+  .vdot[style*="--red"]{background:var(--neon) !important;box-shadow:0 0 4px var(--neon);}
+  .agent-verdict span[style*="--red"]{color:var(--neon) !important;text-shadow:0 0 6px rgba(57,255,20,.4);}
+  .stat-chip.chip-green{
+    text-shadow:0 0 6px rgba(0,214,143,.5);
+  }
+  /* Neon scanline overlay */
+  body::before{
+    content:'';
+    position:fixed;top:0;left:0;right:0;bottom:0;
+    background:repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(57,255,20,.012) 2px,
+      rgba(57,255,20,.012) 4px
+    );
+    pointer-events:none;z-index:9999;
+  }
+
+</style>
+</head>
+<body>
+
+<!-- ══ STATUS BAR ══ -->
+<div class="status-bar">
+  <div class="status-left">
+    <div class="target-lock">
+      <div class="lock-dot"></div>
+      TARGET LOCK: ACTIVE
+    </div>
+    <span class="stat-chip chip-green">● ENGINE ONLINE</span>
+    <span class="stat-chip chip-muted" id="session-uptime">UPTIME: 04:12:38</span>
+  </div>
+  <div class="status-mid">
+    <span class="stat-chip chip-amber">BTC/USDT 67,240 ↑</span>
+    <span class="stat-chip chip-amber">ETH/USDT 3,521 ↑</span>
+    <span class="stat-chip chip-red">SOL/USDT 174.2 ↓</span>
+    <span class="stat-chip chip-muted">PAPER MODE</span>
+  </div>
+  <div class="status-right">
+    <span class="clock-chip" id="topbar-clock">--:--:--</span>
+    <button class="abort-btn" onclick="emergencyAbort()">⬡ EMERGENCY ABORT</button>
+  </div>
+</div>
+
+<!-- ══ LAYOUT ══ -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Crosshair -->
+          <circle cx="18" cy="18" r="16" stroke="#ff3c3c" stroke-width="1.2" stroke-dasharray="3 2"/>
+          <circle cx="18" cy="18" r="8" stroke="#ff3c3c" stroke-width="1.5"/>
+          <circle cx="18" cy="18" r="2.5" fill="#ff3c3c"/>
+          <line x1="18" y1="2" x2="18" y2="10" stroke="#ff3c3c" stroke-width="1.5"/>
+          <line x1="18" y1="26" x2="18" y2="34" stroke="#ff3c3c" stroke-width="1.5"/>
+          <line x1="2" y1="18" x2="10" y2="18" stroke="#ff3c3c" stroke-width="1.5"/>
+          <line x1="26" y1="18" x2="34" y2="18" stroke="#ff3c3c" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">SniBot</div>
+        <div class="brand-tagline">PRECISION TRADING OS</div>
+      </div>
+    </div>
+
+    <nav>
+      <div class="nav-section">Command Center</div>
+      <div class="nav-item active">
+        <span class="nav-ico">🎯</span> Sniper Board
+        <span class="nav-badge">LIVE</span>
+      </div>
+      <div class="nav-item"><span class="nav-ico">📡</span> Sniper Engine</div>
+      <div class="nav-item"><span class="nav-ico">📊</span> Snippets Analytics</div>
+      <div class="nav-item"><span class="nav-ico">⚡</span> Trigger & Execution</div>
+
+      <div class="nav-section">Intelligence</div>
+      <div class="nav-item"><span class="nav-ico">🤖</span> Agent Radar</div>
+      <div class="nav-item"><span class="nav-ico">📈</span> Backfire Testing</div>
+      <div class="nav-item"><span class="nav-ico">🗂</span> Scope History</div>
+
+      <div class="nav-section">Control</div>
+      <div class="nav-item"><span class="nav-ico">💬</span> Telegram Fire</div>
+      <div class="nav-item"><span class="nav-ico">🔔</span> Alert Config</div>
+      <div class="nav-item"><span class="nav-ico">⚙️</span> Armory Settings</div>
+
+      <div class="nav-section">Exchange</div>
+      <div class="nav-item"><span class="nav-ico">🔗</span> Binance Feed</div>
+      <div class="nav-item"><span class="nav-ico">🔗</span> Hyperliquid Feed</div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="conn-row">
+        <div class="conn-dot" style="background:var(--green);box-shadow:0 0 4px var(--green)"></div>
+        <span class="conn-label">OctoBot API</span>
+        <span class="conn-val">port:5001</span>
+      </div>
+      <div class="conn-row">
+        <div class="conn-dot" style="background:var(--green);box-shadow:0 0 4px var(--green)"></div>
+        <span class="conn-label">Telegram</span>
+        <span class="conn-val">active</span>
+      </div>
+      <div class="conn-row">
+        <div class="conn-dot" style="background:var(--amber);box-shadow:0 0 4px var(--amber)"></div>
+        <span class="conn-label">Exchange</span>
+        <span class="conn-val">paper</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div>
+        <div class="page-title">🎯 SNIPER BOARD</div>
+        <div class="page-sub">TARGET OVERVIEW · ACTIVE SNIPES · AGENT RADAR · FIRE CONSOLE</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-standby" onclick="showToast('⏸ Sniper Engine paused — all triggers suspended')">⏸ STANDBY</button>
+        <button class="btn btn-amber" onclick="showToast('📊 Snippet report dispatched to Telegram')">📊 DISPATCH SNIPPET</button>
+        <button class="btn btn-fire" onclick="showToast('🎯 [SniBot]: Sniper Engine armed — scanning targets...')">🎯 ARM ENGINE</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ── TARGET OVERVIEW ── -->
+      <div>
+        <div class="section-label">Target Overview</div>
+        <div class="grid-overview">
+
+          <div class="ov-card locked">
+            <div class="ov-label">Snipe Capital</div>
+            <div class="ov-value" style="color:#fff">$24,318</div>
+            <div class="ov-delta delta-up">↑ +8.2% all-time</div>
+          </div>
+
+          <div class="ov-card amber-accent">
+            <div class="ov-label">Snipe Reserve</div>
+            <div class="ov-value" style="color:var(--amber)">$6,420</div>
+            <div class="ov-delta delta-flat">26.4% idle capital</div>
+          </div>
+
+          <div class="ov-card green-accent">
+            <div class="ov-label">Precision Rate</div>
+            <div class="ov-value" style="color:var(--green)">67.4%</div>
+            <div class="ov-delta delta-up">↑ 38 shots this week</div>
+          </div>
+
+          <div class="ov-card locked">
+            <div class="ov-label">Active Snipes</div>
+            <div class="ov-value" style="color:var(--neon)">4</div>
+            <div class="ov-delta" style="display:flex;gap:6px;margin-top:8px">
+              <span class="stat-chip chip-green" style="font-size:9px">3 LONG</span>
+              <span class="stat-chip chip-red"   style="font-size:9px">1 SHORT</span>
+            </div>
+          </div>
+
+          <div class="ov-card green-accent">
+            <div class="ov-label">Today's P&L</div>
+            <div class="ov-value delta-up" id="pnl-main">+$384</div>
+            <div class="ov-delta delta-up">↑ +1.6% since open</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── ACTIVE SNIPES + CHART ── -->
+      <div class="grid-mid">
+
+        <!-- Active Snipes Board -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">⚡ Active Snipes Board</span>
+            <div style="display:flex;gap:6px">
+              <span class="stat-chip chip-red" style="font-size:9px">4 TARGETS LOCKED</span>
+              <button class="btn btn-standby" style="padding:3px 10px;font-size:10px" onclick="showToast('📋 Full scope history loaded')">SCOPE HISTORY</button>
+            </div>
+          </div>
+          <table class="snipes-table">
+            <thead>
+              <tr>
+                <th>TARGET</th>
+                <th>SIDE</th>
+                <th>ENTRY</th>
+                <th>CURRENT</th>
+                <th>P&L</th>
+                <th>STATUS</th>
+                <th>AGENT</th>
+                <th>ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="snipes-tbody">
+              <tr>
+                <td><span class="pair-tag">BTC/USDT</span></td>
+                <td><span class="side-long">LONG ↑</span></td>
+                <td>65,100</td><td>67,240</td>
+                <td class="delta-up">+$214</td>
+                <td><span class="status-locked">🎯 LOCKED</span></td>
+                <td style="color:var(--muted);font-size:9px">SIGNAL</td>
+                <td><button class="action-btn action-exit" onclick="exitSnipe('BTC/USDT')">EXIT</button></td>
+              </tr>
+              <tr>
+                <td><span class="pair-tag">ETH/USDT</span></td>
+                <td><span class="side-long">LONG ↑</span></td>
+                <td>3,380</td><td>3,521</td>
+                <td class="delta-up">+$141</td>
+                <td><span class="status-locked">🎯 LOCKED</span></td>
+                <td style="color:var(--muted);font-size:9px">TA</td>
+                <td><button class="action-btn action-exit" onclick="exitSnipe('ETH/USDT')">EXIT</button></td>
+              </tr>
+              <tr>
+                <td><span class="pair-tag">SOL/USDT</span></td>
+                <td><span class="side-short" style="color:var(--danger)">SHORT ↓</span></td>
+                <td>178.4</td><td>174.2</td>
+                <td class="delta-up">+$42</td>
+                <td><span class="status-tracking">◎ TRACKING</span></td>
+                <td style="color:var(--muted);font-size:9px">JUDGE</td>
+                <td><button class="action-btn action-hold" onclick="showToast('⏸ SOL/USDT held — monitoring...')">HOLD</button></td>
+              </tr>
+              <tr>
+                <td><span class="pair-tag">BNB/USDT</span></td>
+                <td><span class="side-long">LONG ↑</span></td>
+                <td>612.0</td><td>608.5</td>
+                <td class="delta-down" style="color:var(--danger)">-$35</td>
+                <td><span class="status-tracking">◎ TRACKING</span></td>
+                <td style="color:var(--muted);font-size:9px">SIGNAL</td>
+                <td><button class="action-btn action-exit" onclick="exitSnipe('BNB/USDT')">EXIT</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- AI Agent Radar -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">📡 Agent Radar</span>
+            <span class="stat-chip chip-green" style="font-size:9px">5/6 ACTIVE</span>
+          </div>
+          <div class="radar-grid">
+
+            <div class="agent-cell">
+              <div class="agent-name">Sniper Engine</div>
+              <div class="agent-role">LIQUIDITY · BREAKOUT</div>
+              <div class="conf-track"><div class="conf-fill" style="width:88%;background:var(--neon)"></div></div>
+              <div class="agent-verdict">
+                <div class="vdot" style="background:var(--neon)"></div>
+                <span style="color:var(--muted)">Conf:</span>
+                <span style="color:var(--neon)">88% — BUY BTC</span>
+              </div>
+            </div>
+
+            <div class="agent-cell">
+              <div class="agent-name">TA Analyst</div>
+              <div class="agent-role">INDICATORS · PA</div>
+              <div class="conf-track"><div class="conf-fill" style="width:82%;background:var(--amber)"></div></div>
+              <div class="agent-verdict">
+                <div class="vdot" style="background:var(--amber)"></div>
+                <span style="color:var(--muted)">Conf:</span>
+                <span style="color:var(--amber)">82% — BULLISH</span>
+              </div>
+            </div>
+
+            <div class="agent-cell">
+              <div class="agent-name">Judge Agent</div>
+              <div class="agent-role">DECISION MAKER</div>
+              <div class="conf-track"><div class="conf-fill" style="width:64%;background:var(--amber)"></div></div>
+              <div class="agent-verdict">
+                <div class="vdot" style="background:var(--amber)"></div>
+                <span style="color:var(--muted)">Conf:</span>
+                <span style="color:var(--amber)">64% — AWAIT</span>
+              </div>
+            </div>
+
+            <div class="agent-cell">
+              <div class="agent-name">Risk Agent</div>
+              <div class="agent-role">EXPOSURE CONTROL</div>
+              <div class="conf-track"><div class="conf-fill" style="width:91%;background:var(--green)"></div></div>
+              <div class="agent-verdict">
+                <div class="vdot" style="background:var(--green)"></div>
+                <span style="color:var(--muted)">Conf:</span>
+                <span style="color:var(--green)">91% — SAFE</span>
+              </div>
+            </div>
+
+            <div class="agent-cell">
+              <div class="agent-name">Trigger Agent</div>
+              <div class="agent-role">ENTRY · EXIT</div>
+              <div class="conf-track"><div class="conf-fill" style="width:76%;background:var(--neon)"></div></div>
+              <div class="agent-verdict">
+                <div class="vdot" style="background:var(--neon)"></div>
+                <span style="color:var(--muted)">Conf:</span>
+                <span style="color:var(--neon)">76% — FIRE READY</span>
+              </div>
+            </div>
+
+            <div class="agent-cell">
+              <div class="agent-name">Sentiment AI</div>
+              <div class="agent-role">SOCIAL · NEWS</div>
+              <div class="conf-track"><div class="conf-fill" style="width:55%;background:var(--muted)"></div></div>
+              <div class="agent-verdict">
+                <div class="vdot" style="background:var(--muted)"></div>
+                <span style="color:var(--muted)">Conf: 55% — NEUTRAL</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── BOTTOM: CONSOLE + SNIPPETS ── -->
+      <div class="grid-bottom">
+
+        <!-- Manual Snipe Console -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">🔫 Manual Snipe Console</span>
+            <span class="stat-chip chip-amber" style="font-size:9px">MANUAL OVERRIDE</span>
+          </div>
+          <div class="console-form">
+            <div class="form-row">
+              <div>
+                <div class="field-label">TARGET PAIR</div>
+                <input class="field-input" id="f-pair" placeholder="BTC/USDT" value="BTC/USDT"/>
+              </div>
+              <div>
+                <div class="field-label">SIDE</div>
+                <select class="field-select" id="f-side">
+                  <option>LONG</option>
+                  <option>SHORT</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <div class="field-label">ENTRY PRICE</div>
+                <input class="field-input" id="f-entry" placeholder="67,240"/>
+              </div>
+              <div>
+                <div class="field-label">CAPITAL (USDT)</div>
+                <input class="field-input" id="f-amount" placeholder="500"/>
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <div class="field-label">STOP LOSS</div>
+                <input class="field-input" id="f-sl" placeholder="66,000"/>
+              </div>
+              <div>
+                <div class="field-label">TAKE PROFIT</div>
+                <input class="field-input" id="f-tp" placeholder="69,500"/>
+              </div>
+            </div>
+            <div class="fire-row">
+              <button class="btn-fire-full" onclick="fireManualSnipe()">🎯 FIRE SNIPE</button>
+              <button class="btn-cancel-full" onclick="clearConsole()">CLEAR</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Snippets Analytics Feed -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">📡 Snippets Analytics Feed</span>
+            <button class="btn btn-standby" style="padding:3px 10px;font-size:10px" onclick="addSnippet()">+ NEW SNIPPET</button>
+          </div>
+          <div class="snippets-feed" id="snippets-feed">
+
+            <div class="snippet locked">
+              <div class="snip-meta"><span>🎯 SniBot LOCK</span><span id="t1">09:14</span></div>
+              <div class="snip-body">Target acquired on BTCUSDT. Price at major support $65,100. Liquidity scan complete. Trigger armed — awaiting breakout confirmation.</div>
+            </div>
+
+            <div class="snippet alert">
+              <div class="snip-meta"><span>📊 Market Snippet</span><span>09:02</span></div>
+              <div class="snip-body">Layer 1 sector showing buying momentum over last 15 min. BTC dominance rising. SOL/ETH lagging — potential rotation play.</div>
+            </div>
+
+            <div class="snippet executed">
+              <div class="snip-meta"><span>⚡ Execution Log</span><span>08:47</span></div>
+              <div class="snip-body">ETHUSDT LONG executed @ 3,380. Signal Agent confidence 88%. Risk Agent cleared. Position size: $2,100. SL: 3,310. TP: 3,600.</div>
+            </div>
+
+            <div class="snippet info">
+              <div class="snip-meta"><span>🔎 Sniper Engine</span><span>08:31</span></div>
+              <div class="snip-body">Order book scan complete. BTC bid wall detected at $65,000. Whale accumulation pattern identified. Snipe reserve allocated.</div>
+            </div>
+
+            <div class="snippet alert">
+              <div class="snip-meta"><span>📊 Market Snippet</span><span>08:15</span></div>
+              <div class="snip-body">Funding rates neutral across major pairs. Open interest BTC up 4.2% in 1H. Market condition: favorable for breakout strategy.</div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </div><!-- /content -->
+  </main>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── Clock ── */
+function tick(){
+  const now=new Date();
+  document.getElementById('topbar-clock').textContent=
+    now.toLocaleTimeString('en-GB');
+}
+tick(); setInterval(tick,1000);
+
+/* ── Uptime ── */
+let upSec=4*3600+12*60+38;
+setInterval(()=>{
+  upSec++;
+  const h=String(Math.floor(upSec/3600)).padStart(2,'0');
+  const m=String(Math.floor((upSec%3600)/60)).padStart(2,'0');
+  const s=String(upSec%60).padStart(2,'0');
+  document.getElementById('session-uptime').textContent=`UPTIME: ${h}:${m}:${s}`;
+},1000);
+
+/* ── PnL live fluctuation ── */
+setInterval(()=>{
+  const v=384+Math.floor((Math.random()-.35)*25);
+  const el=document.getElementById('pnl-main');
+  el.textContent=(v>=0?'+':'')+`$${v}`;
+  el.className='ov-value '+(v>=0?'delta-up':'delta-down');
+},3500);
+
+/* ── Toast ── */
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+/* ── Emergency Abort ── */
+function emergencyAbort(){
+  if(confirm('⛔ EMERGENCY ABORT — Halt all active snipes and freeze engine?')){
+    showToast('⛔ [SniBot]: ABORT executed. All triggers suspended. Review positions.');
+  }
+}
+
+/* ── Exit Snipe ── */
+function exitSnipe(pair){
+  if(confirm(`Exit position: ${pair}?`)){
+    showToast(`⚡ [SniBot]: ${pair} position closed. Scope cleared. PnL booked.`);
+  }
+}
+
+/* ── Manual Snipe Console ── */
+function fireManualSnipe(){
+  const pair   = document.getElementById('f-pair').value  || 'BTC/USDT';
+  const side   = document.getElementById('f-side').value;
+  const entry  = document.getElementById('f-entry').value || 'MARKET';
+  const amount = document.getElementById('f-amount').value|| '0';
+  const sl     = document.getElementById('f-sl').value    || '—';
+  const tp     = document.getElementById('f-tp').value    || '—';
+  const msg=`🎯 [SniBot]: Manual snipe fired — ${pair} ${side} @ ${entry} | Capital: $${amount} | SL: ${sl} | TP: ${tp}`;
+  addSnippetItem(msg,'executed');
+  showToast(`🎯 Manual snipe executed: ${pair} ${side}`);
+}
+function clearConsole(){
+  ['f-pair','f-entry','f-amount','f-sl','f-tp'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-pair').value='BTC/USDT';
+}
+
+/* ── Snippet feed ── */
+const snippetPool=[
+  {cls:'locked', tag:'🎯 SniBot LOCK',   txt:'SOLUSDT approaching breakout zone. Order book showing reduced ask wall above $180. Monitoring for volume confirmation.'},
+  {cls:'alert',  tag:'📊 Market Snippet', txt:'BTC.D rising — altcoins facing headwinds short-term. Recommend holding BTC/ETH snipes. Avoid new ALTS entries.'},
+  {cls:'info',   tag:'🔎 Sniper Engine',  txt:'Liquidity scan: BNBUSDT bid cluster at $605. Potential bounce trade. Snipe reserve: sufficient. Risk: LOW.'},
+  {cls:'executed',tag:'⚡ Execution Log', txt:'SOLUSDT SHORT executed @ 178.4. Judge Agent cleared. Trigger confirmed. SL: 184. TP: 168.'},
+];
+let pool_i=0;
+function addSnippet(){
+  const s=snippetPool[pool_i%snippetPool.length]; pool_i++;
+  addSnippetItem(s.txt, s.cls, s.tag);
+}
+function addSnippetItem(txt,cls,tag='📡 SniBot'){
+  const feed=document.getElementById('snippets-feed');
+  const now=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const div=document.createElement('div');
+  div.className=`snippet ${cls}`;
+  div.innerHTML=`<div class="snip-meta"><span>${tag}</span><span>${now}</span></div><div class="snip-body">${txt}</div>`;
+  feed.insertBefore(div,feed.firstChild);
+}
+
+/* ── Auto snippets every 18s ── */
+setInterval(addSnippet, 18000);
+</script>
+</body>
+</html>
