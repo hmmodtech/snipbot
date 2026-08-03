@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>SniBot — Sniper Board</title>
+<title>SnipBot — Sniper Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -467,7 +467,7 @@ nav{padding:14px 10px;flex:1;overflow-y:auto;}
         </svg>
       </div>
       <div>
-        <div class="brand-name">SniBot</div>
+        <div class="brand-name">SnipBot</div>
         <div class="brand-tagline">PRECISION TRADING OS</div>
       </div>
     </div>
@@ -528,7 +528,7 @@ nav{padding:14px 10px;flex:1;overflow-y:auto;}
       <div class="topbar-actions">
         <button class="btn btn-standby" onclick="showToast('⏸ Sniper Engine paused — all triggers suspended')">⏸ STANDBY</button>
         <button class="btn btn-amber" onclick="showToast('📊 Snippet report dispatched to Telegram')">📊 DISPATCH SNIPPET</button>
-        <button class="btn btn-fire" onclick="showToast('🎯 [SniBot]: Sniper Engine armed — scanning targets...')">🎯 ARM ENGINE</button>
+        <button class="btn btn-fire" onclick="showToast('🎯 [SnipBot]: Sniper Engine armed — scanning targets...')">🎯 ARM ENGINE</button>
       </div>
     </div>
 
@@ -778,7 +778,7 @@ nav{padding:14px 10px;flex:1;overflow-y:auto;}
           <div class="snippets-feed" id="snippets-feed">
 
             <div class="snippet locked">
-              <div class="snip-meta"><span>🎯 SniBot LOCK</span><span id="t1">09:14</span></div>
+              <div class="snip-meta"><span>🎯 SnipBot LOCK</span><span id="t1">09:14</span></div>
               <div class="snip-body">Target acquired on BTCUSDT. Price at major support $65,100. Liquidity scan complete. Trigger armed — awaiting breakout confirmation.</div>
             </div>
 
@@ -851,14 +851,14 @@ function showToast(msg){
 /* ── Emergency Abort ── */
 function emergencyAbort(){
   if(confirm('⛔ EMERGENCY ABORT — Halt all active snipes and freeze engine?')){
-    showToast('⛔ [SniBot]: ABORT executed. All triggers suspended. Review positions.');
+    showToast('⛔ [SnipBot]: ABORT executed. All triggers suspended. Review positions.');
   }
 }
 
 /* ── Exit Snipe ── */
 function exitSnipe(pair){
   if(confirm(`Exit position: ${pair}?`)){
-    showToast(`⚡ [SniBot]: ${pair} position closed. Scope cleared. PnL booked.`);
+    showToast(`⚡ [SnipBot]: ${pair} position closed. Scope cleared. PnL booked.`);
   }
 }
 
@@ -870,7 +870,7 @@ function fireManualSnipe(){
   const amount = document.getElementById('f-amount').value|| '0';
   const sl     = document.getElementById('f-sl').value    || '—';
   const tp     = document.getElementById('f-tp').value    || '—';
-  const msg=`🎯 [SniBot]: Manual snipe fired — ${pair} ${side} @ ${entry} | Capital: $${amount} | SL: ${sl} | TP: ${tp}`;
+  const msg=`🎯 [SnipBot]: Manual snipe fired — ${pair} ${side} @ ${entry} | Capital: $${amount} | SL: ${sl} | TP: ${tp}`;
   addSnippetItem(msg,'executed');
   showToast(`🎯 Manual snipe executed: ${pair} ${side}`);
 }
@@ -881,7 +881,7 @@ function clearConsole(){
 
 /* ── Snippet feed ── */
 const snippetPool=[
-  {cls:'locked', tag:'🎯 SniBot LOCK',   txt:'SOLUSDT approaching breakout zone. Order book showing reduced ask wall above $180. Monitoring for volume confirmation.'},
+  {cls:'locked', tag:'🎯 SnipBot LOCK',   txt:'SOLUSDT approaching breakout zone. Order book showing reduced ask wall above $180. Monitoring for volume confirmation.'},
   {cls:'alert',  tag:'📊 Market Snippet', txt:'BTC.D rising — altcoins facing headwinds short-term. Recommend holding BTC/ETH snipes. Avoid new ALTS entries.'},
   {cls:'info',   tag:'🔎 Sniper Engine',  txt:'Liquidity scan: BNBUSDT bid cluster at $605. Potential bounce trade. Snipe reserve: sufficient. Risk: LOW.'},
   {cls:'executed',tag:'⚡ Execution Log', txt:'SOLUSDT SHORT executed @ 178.4. Judge Agent cleared. Trigger confirmed. SL: 184. TP: 168.'},
@@ -891,7 +891,7 @@ function addSnippet(){
   const s=snippetPool[pool_i%snippetPool.length]; pool_i++;
   addSnippetItem(s.txt, s.cls, s.tag);
 }
-function addSnippetItem(txt,cls,tag='📡 SniBot'){
+function addSnippetItem(txt,cls,tag='📡 SnipBot'){
   const feed=document.getElementById('snippets-feed');
   const now=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   const div=document.createElement('div');
