@@ -1,17 +1,18 @@
 {
   "crypto_currencies": {
     "Bitcoin": {
-      "pairs": {
-        "BTC/USDT": {}
-      }
+      "pairs": {"BTC/USDT": {}}
     },
     "Ethereum": {
-      "pairs": {
-        "ETH/USDT": {}
-      }
+      "pairs": {"ETH/USDT": {}}
     }
   },
-  "exchanges": {},
+  "exchanges": {
+    "binanceus": {
+      "api-key": "",
+      "api-secret": ""
+    }
+  },
   "trader": {
     "enabled": false
   },
@@ -19,19 +20,9 @@
     "enabled": true,
     "fees": 0.1,
     "starting_portfolio": {
-      "USDT": 10000
-    }
-  },
-  "services": {
-    "interface": {
-      "web": {
-        "ip": "0.0.0.0",
-        "port": 5001,
-        "cors": {
-          "enabled": true,
-          "origins": ["*"]
-        }
-      }
+      "USDT": 10000,
+      "BTC": 0,
+      "ETH": 0
     }
   }
 }
