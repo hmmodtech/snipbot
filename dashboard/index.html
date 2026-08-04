@@ -165,7 +165,7 @@ nav{padding:12px 10px;flex:1;overflow-y:auto;}
 
 <!-- CONFIG — يغيّر المستخدم الـ URL هنا -->
 <script>
-const OCTOBOT_API = 'https://snipbot-y.up.railway.app;
+const OCTOBOT_API = '';
 const REFRESH_MS  = 8000; // تحديث كل 8 ثواني
 </script>
 
@@ -415,7 +415,7 @@ function setApiStatus(ok){
 /* ── FETCH WRAPPER ── */
 async function apiFetch(path){
   try{
-    const r=await fetch(API+path,{headers:{'Content-Type':'application/json'}});
+    const r = await fetch('/octobot-api' + path, {...});
     if(!r.ok) throw new Error(r.status);
     return await r.json();
   } catch(e){ return null; }
