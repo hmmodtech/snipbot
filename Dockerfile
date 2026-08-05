@@ -2,12 +2,18 @@ FROM python:3.11-slim
 
 WORKDIR /octobot
 
-RUN apt-get update && apt-get install -y git gcc g++ && \
-    git clone --branch 2.0.16 https://github.com/Drakkar-Software/OctoBot.git . && \
-    pip install --no-cache-dir "octobot[full]==2.0.16"
+RUN apt-get update && apt-get install -y \
+    git gcc g++ make libffi-dev libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN echo "WITHDRAWAL_ENABLED = False" >> octobot/constants.py && \
-    echo "TRANSFER_ENABLED = False" >> octobot/constants.py
+RUN pip install --no-cache-dir psutil
+
+RUN git clone --depth 1 --branch 2.0.16 \
+    https://github.com/Drakkar-Software/OctoBot.git .
+
+RUN pip install --no-cache-dir "octobot[full]==2.0.16"
+
+RUN pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 5001
 
