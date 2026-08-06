@@ -370,7 +370,7 @@ const REFRESH_MS  = 8000; // تحديث كل 8 ثواني
 <script>
 /* ── CONFIG ── */
 // غيّر هذا للرابط الحقيقي لـ SnipBot Engine
-const API = typeof OCTOBOT_API !== 'undefined' ? OCTOBOT_API : 'https://snipbot-x.up.railway.app';
+const API = 'https://snipbot-y.up.railway.app';
 
 /* ── CLOCK ── */
 let upSec = 0;
@@ -415,7 +415,7 @@ function setApiStatus(ok){
 /* ── FETCH WRAPPER ── */
 async function apiFetch(path){
   try{
-    const r = await fetch('/octobot-api' + path, {...});
+    const r=await fetch(API+path);
     if(!r.ok) throw new Error(r.status);
     return await r.json();
   } catch(e){ return null; }
