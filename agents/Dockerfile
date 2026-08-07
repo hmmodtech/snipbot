@@ -9,5 +9,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # نسخ كل الملفات
 COPY . .
 # تحديث بسيط لإجبار إعادة البناء - 2026-08-07
+# تحديث بسيط لإجبار إعادة البناء - 2026-08-07 - محاولة ثانية
 
 CMD ["python", "main.py"]
