@@ -1,111 +1,154 @@
 """
-Strategy Manager — مدير الاستراتيجيات
-يشغّل استراتيجية أو أكثر على نفس الزوج
-ويجمع قراراتهم بنظام تصويت
+SnipBot — Strategy Manager
+---------------------------
+Weighted vote across all registered strategies.
+Final decision requires MIN_CONFIDENCE and MIN_AGREEMENT.
+
+Vote system:
+  Each strategy returns BUY / SELL / HOLD with a confidence score.
+  Weighted score = confidence × strategy.weight
+  If total weighted score for BUY >= threshold → FIRE BUY
+  Same for SELL.
 """
 
 import logging
-from strategies import get_strategy, list_strategies
+from typing import Optional
+import pandas as pd
 
-log = logging.getLogger("Strategy-Manager")
+from .strategies import REGISTRY
+from .strategies.base_strategy import Signal
+
+log = logging.getLogger("SnipBot.StrategyManager")
 
 
 class StrategyManager:
-    """
-    يدير استراتيجيات متعددة
-    
-    كيف يعمل:
-    - تعطيه قائمة استراتيجيات
-    - يشغّلها كلها على نفس الزوج
-    - يجمع قراراتهم بتصويت موزون
-    - يرجع قرار واحد نهائي
-    """
 
-    def __init__(self, strategy_names: list = None):
+    MIN_CONFIDENCE  = 62.0   # weighted avg confidence to act
+    MIN_AGREEMENT   = 0.55   # 55% of total weight must agree
+
+    def __init__(self, config: dict = None):
+        self.config = config or {}
+        # Instantiate all registered strategies
+        self.strategies = [cls(config) for cls in REGISTRY.values()]
+        log.info(
+            f"🎯 [SnipBot]: StrategyManager armed — "
+            f"{len(self.strategies)} strategies loaded: "
+            f"{[s.name for s in self.strategies]}"
+        )
+
+    def vote(self, pair: str, df: pd.DataFrame) -> Optional[Signal]:
         """
-        strategy_names: قائمة أسماء الاستراتيجيات
-        مثال: ["TA", "DCA"]
+        Run all strategies on the same OHLCV data, collect votes,
+        return final Signal or None if no consensus.
         """
-        if strategy_names is None:
-            strategy_names = list_strategies()  # كل الاستراتيجيات
-
-        self.strategies = []
-        for name in strategy_names:
-            try:
-                strategy = get_strategy(name)
-                self.strategies.append(strategy)
-                log.info(f"[Manager]: Loaded strategy — {name}")
-            except Exception as e:
-                log.error(f"[Manager]: Failed to load {name} — {e}")
-
-        log.info(f"[Manager]: {len(self.strategies)} strategies ready")
-
-    def run(self, df, symbol: str) -> dict:
-        """
-        يشغّل كل الاستراتيجيات ويجمع النتائج
-        """
-        if not self.strategies:
-            return {
-                "symbol": symbol,
-                "signal": "HOLD",
-                "confidence": 0,
-                "reason": "No strategies loaded",
-                "details": []
-            }
-
-        results    = []
-        buy_votes  = 0
-        sell_votes = 0
-        hold_votes = 0
-        total_conf = 0
-
+        signals = []
         for strategy in self.strategies:
-            result = strategy.analyze(df, symbol)
-            results.append(result)
+            try:
+                sig = strategy.analyze(pair, df)
+                signals.append(sig)
+                log.debug(
+                    f"◎ [Agent Radar]: {strategy.name} → "
+                    f"{sig.action} {sig.confidence:.1f}% — {sig.reason[:60]}"
+                )
+            except Exception as e:
+                log.warning(f"⚠ [{strategy.name}] error on {pair}: {e}")
 
-            sig  = result.get("signal", "HOLD")
-            conf = result.get("confidence", 50)
-            total_conf += conf
+        if not signals:
+            return None
 
-            if sig == "BUY":
-                buy_votes  += conf
-            elif sig == "SELL":
-                sell_votes += conf
-            else:
-                hold_votes += conf
+        # ── Weighted tally ────────────────────────────────────────────────────
+        total_weight = sum(s.weight for s in self.strategies)
+        buy_weight  = 0.0
+        sell_weight = 0.0
+        buy_conf_sum  = 0.0
+        sell_conf_sum = 0.0
 
-        # ── نظام التصويت الموزون ──
-        avg_confidence = round(total_conf / len(results), 1)
-        total_votes    = buy_votes + sell_votes + hold_votes
+        for sig, strat in zip(signals, self.strategies):
+            w = strat.weight
+            if sig.action == "BUY":
+                buy_weight    += w
+                buy_conf_sum  += sig.confidence * w
+            elif sig.action == "SELL":
+                sell_weight   += w
+                sell_conf_sum += sig.confidence * w
 
-        buy_pct  = (buy_votes  / total_votes * 100) if total_votes > 0 else 0
-        sell_pct = (sell_votes / total_votes * 100) if total_votes > 0 else 0
+        buy_agree  = buy_weight  / total_weight   # 0.0–1.0
+        sell_agree = sell_weight / total_weight
 
-        # القرار النهائي
-        if buy_pct >= 60 and avg_confidence >= 60:
-            final_signal = "BUY"
-            reason = f"✅ {buy_pct:.0f}% strategies say BUY"
-        elif sell_pct >= 60 and avg_confidence >= 60:
-            final_signal = "SELL"
-            reason = f"📉 {sell_pct:.0f}% strategies say SELL"
-        else:
-            final_signal = "HOLD"
-            reason = f"⏳ Mixed signals — BUY:{buy_pct:.0f}% SELL:{sell_pct:.0f}%"
-
-        final = {
-            "symbol":     symbol,
-            "signal":     final_signal,
-            "confidence": avg_confidence,
-            "reason":     reason,
-            "buy_pct":    round(buy_pct, 1),
-            "sell_pct":   round(sell_pct, 1),
-            "strategies_count": len(results),
-            "details":    results
-        }
+        buy_conf_avg  = (buy_conf_sum  / buy_weight)  if buy_weight  > 0 else 0.0
+        sell_conf_avg = (sell_conf_sum / sell_weight) if sell_weight > 0 else 0.0
 
         log.info(
-            f"[Manager]: {symbol} → {final_signal} "
-            f"({avg_confidence}%) | "
-            f"BUY:{buy_pct:.0f}% SELL:{sell_pct:.0f}%"
+            f"🔎 [Sniper Engine]: {pair} vote → "
+            f"BUY {buy_agree*100:.0f}% agree @ {buy_conf_avg:.1f}% conf | "
+            f"SELL {sell_agree*100:.0f}% agree @ {sell_conf_avg:.1f}% conf"
         )
-        return final
+
+        # ── Decision ─────────────────────────────────────────────────────────
+        if (buy_agree >= self.MIN_AGREEMENT and
+                buy_conf_avg >= self.MIN_CONFIDENCE and
+                buy_conf_avg > sell_conf_avg):
+
+            # Synthesize final BUY signal
+            best = max(
+                (s for s in signals if s.action == "BUY"),
+                key=lambda s: s.confidence,
+            )
+            reasons = " | ".join(
+                f"{s.strategy}:{s.confidence:.0f}%"
+                for s in signals if s.action == "BUY"
+            )
+            return Signal(
+                pair=pair,
+                action="BUY",
+                confidence=buy_conf_avg,
+                strategy="StrategyManager",
+                reason=f"CONSENSUS BUY [{buy_agree*100:.0f}% agree] — {reasons}",
+                entry_price=best.entry_price,
+                stop_loss=best.stop_loss,
+                take_profit=best.take_profit,
+            )
+
+        if (sell_agree >= self.MIN_AGREEMENT and
+                sell_conf_avg >= self.MIN_CONFIDENCE and
+                sell_conf_avg > buy_conf_avg):
+
+            best = max(
+                (s for s in signals if s.action == "SELL"),
+                key=lambda s: s.confidence,
+            )
+            reasons = " | ".join(
+                f"{s.strategy}:{s.confidence:.0f}%"
+                for s in signals if s.action == "SELL"
+            )
+            return Signal(
+                pair=pair,
+                action="SELL",
+                confidence=sell_conf_avg,
+                strategy="StrategyManager",
+                reason=f"CONSENSUS SELL [{sell_agree*100:.0f}% agree] — {reasons}",
+                entry_price=best.entry_price,
+                stop_loss=best.stop_loss,
+                take_profit=best.take_profit,
+            )
+
+        # No consensus
+        hold_reason = (
+            f"No consensus on {pair} — "
+            f"BUY {buy_agree*100:.0f}%/{buy_conf_avg:.0f}% · "
+            f"SELL {sell_agree*100:.0f}%/{sell_conf_avg:.0f}% · "
+            f"need >{self.MIN_AGREEMENT*100:.0f}% agree & >{self.MIN_CONFIDENCE:.0f}% conf"
+        )
+        log.info(f"◎ [SnipBot Tracking]: {pair} — {hold_reason}")
+        return None
+
+    def status(self) -> dict:
+        """Return agent status for dashboard Agent Radar panel."""
+        return {
+            "strategies": [
+                {"name": s.name, "weight": s.weight}
+                for s in self.strategies
+            ],
+            "min_confidence": self.MIN_CONFIDENCE,
+            "min_agreement":  self.MIN_AGREEMENT,
+        }
