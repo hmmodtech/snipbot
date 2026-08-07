@@ -1,181 +1,155 @@
 """
-TA Strategy — التحليل الفني
-مستلهم من freqtrade's SampleStrategy
-يستخدم: RSI + EMA + Bollinger Bands + MACD
+SnipBot — Technical Analysis Strategy
+--------------------------------------
+Indicators: RSI · EMA9/21 · MACD · Bollinger Bands
+Library: ta==0.11.0 (replaces pandas-ta — Python 3.11 compatible)
+
+Signal logic:
+  BUY  if RSI oversold + EMA bullish cross + MACD bullish + price near BB lower
+  SELL if RSI overbought + EMA bearish cross + MACD bearish + price near BB upper
+  HOLD otherwise
 """
 
 import pandas as pd
-import pandas_ta as ta
-import logging
-from .base_strategy import BaseStrategy
+import ta.momentum
+import ta.trend
+import ta.volatility
 
-log = logging.getLogger("TA-Strategy")
+from .base_strategy import BaseStrategy, Signal
 
 
 class TAStrategy(BaseStrategy):
-    """
-    استراتيجية التحليل الفني الكاملة
-    
-    منطق الشراء (مستلهم من freqtrade):
-    ✅ RSI < 35 (مبالغ في البيع)
-    ✅ السعر تحت Bollinger Band السفلي
-    ✅ EMA9 > EMA21 (اتجاه صاعد)
-    ✅ MACD يتقاطع للأعلى
-    
-    منطق البيع:
-    ❌ RSI > 65 (مبالغ في الشراء)
-    ❌ السعر فوق Bollinger Band العلوي
-    ❌ EMA9 < EMA21 (اتجاه هابط)
-    """
 
-    NAME = "TA Strategy"
-    VERSION = "1.0"
-    TIMEFRAME = "1h"
-    CANDLES_NEEDED = 50
+    name = "TA Analyst"
+    weight = 1.0   # 20% weight in 5-strategy vote (manager normalizes)
 
-    # معاملات RSI
-    RSI_BUY_THRESHOLD  = 35
-    RSI_SELL_THRESHOLD = 65
-    RSI_PERIOD         = 14
+    # ── Tunable thresholds ──────────────────────────────────────────────────
+    RSI_OVERSOLD   = 38
+    RSI_OVERBOUGHT = 62
+    EMA_FAST       = 9
+    EMA_SLOW       = 21
+    MACD_FAST      = 12
+    MACD_SLOW      = 26
+    MACD_SIGNAL    = 9
+    BB_WINDOW      = 20
+    BB_STD         = 2.0
+    MIN_ROWS       = 50    # need 50 candles for MACD(26) to be stable
 
-    # معاملات EMA
-    EMA_FAST = 9
-    EMA_SLOW = 21
+    def analyze(self, pair: str, df: pd.DataFrame) -> Signal:
+        if not self._validate_df(df, self.MIN_ROWS):
+            return self.hold(pair, "Insufficient data for TA analysis")
 
-    # معاملات Bollinger Bands
-    BB_PERIOD = 20
-    BB_STD    = 2.0
+        closes = df["close"]
+        highs  = df["high"]
+        lows   = df["low"]
 
-    def analyze(self, df: pd.DataFrame, symbol: str) -> dict:
-        """التحليل الفني الكامل"""
+        # ── RSI ──────────────────────────────────────────────────────────────
+        rsi_series = ta.momentum.RSIIndicator(closes, window=14).rsi()
+        rsi = rsi_series.iloc[-1]
 
-        if not self.validate_df(df):
-            return self._empty_result(symbol, "Insufficient data")
+        # ── EMA cross ────────────────────────────────────────────────────────
+        ema_fast = ta.trend.EMAIndicator(closes, window=self.EMA_FAST).ema_indicator()
+        ema_slow = ta.trend.EMAIndicator(closes, window=self.EMA_SLOW).ema_indicator()
+        ema_cross_bull = (
+            ema_fast.iloc[-1] > ema_slow.iloc[-1] and
+            ema_fast.iloc[-2] <= ema_slow.iloc[-2]
+        )
+        ema_cross_bear = (
+            ema_fast.iloc[-1] < ema_slow.iloc[-1] and
+            ema_fast.iloc[-2] >= ema_slow.iloc[-2]
+        )
+        ema_bull = ema_fast.iloc[-1] > ema_slow.iloc[-1]
+        ema_bear = ema_fast.iloc[-1] < ema_slow.iloc[-1]
 
-        try:
-            # ── حساب المؤشرات ──
-            # RSI
-            df["rsi"] = ta.rsi(df["close"], length=self.RSI_PERIOD)
+        # ── MACD ─────────────────────────────────────────────────────────────
+        macd_obj    = ta.trend.MACD(
+            closes,
+            window_fast=self.MACD_FAST,
+            window_slow=self.MACD_SLOW,
+            window_sign=self.MACD_SIGNAL,
+        )
+        macd_line   = macd_obj.macd()
+        signal_line = macd_obj.macd_signal()
+        macd_bull   = macd_line.iloc[-1] > signal_line.iloc[-1]
+        macd_bear   = macd_line.iloc[-1] < signal_line.iloc[-1]
+        macd_cross_bull = (
+            macd_line.iloc[-1] > signal_line.iloc[-1] and
+            macd_line.iloc[-2] <= signal_line.iloc[-2]
+        )
+        macd_cross_bear = (
+            macd_line.iloc[-1] < signal_line.iloc[-1] and
+            macd_line.iloc[-2] >= signal_line.iloc[-2]
+        )
 
-            # EMA
-            df["ema_fast"] = ta.ema(df["close"], length=self.EMA_FAST)
-            df["ema_slow"] = ta.ema(df["close"], length=self.EMA_SLOW)
+        # ── Bollinger Bands ───────────────────────────────────────────────────
+        bb = ta.volatility.BollingerBands(
+            closes, window=self.BB_WINDOW, window_dev=self.BB_STD
+        )
+        bb_upper = bb.bollinger_hband().iloc[-1]
+        bb_lower = bb.bollinger_lband().iloc[-1]
+        bb_mid   = bb.bollinger_mavg().iloc[-1]
+        price    = closes.iloc[-1]
 
-            # Bollinger Bands
-            bb = ta.bbands(df["close"], length=self.BB_PERIOD, std=self.BB_STD)
-            df["bb_upper"] = bb[f"BBU_{self.BB_PERIOD}_{self.BB_STD}"]
-            df["bb_lower"] = bb[f"BBL_{self.BB_PERIOD}_{self.BB_STD}"]
-            df["bb_mid"]   = bb[f"BBM_{self.BB_PERIOD}_{self.BB_STD}"]
+        near_lower = price <= bb_lower * 1.01   # within 1% of lower band
+        near_upper = price >= bb_upper * 0.99   # within 1% of upper band
 
-            # MACD
-            macd = ta.macd(df["close"])
-            df["macd"]        = macd["MACD_12_26_9"]
-            df["macd_signal"] = macd["MACDs_12_26_9"]
-            df["macd_hist"]   = macd["MACDh_12_26_9"]
+        # ── Scoring (0–4 bullish signals, 0–4 bearish) ───────────────────────
+        bull_score = sum([
+            rsi < self.RSI_OVERSOLD,
+            ema_bull,
+            macd_bull,
+            near_lower,
+        ])
+        bear_score = sum([
+            rsi > self.RSI_OVERBOUGHT,
+            ema_bear,
+            macd_bear,
+            near_upper,
+        ])
 
-            # ── آخر قيم ──
-            last       = df.iloc[-1]
-            prev       = df.iloc[-2]
+        # Cross signals add bonus weight
+        cross_bonus = 20.0
+        bull_bonus = (ema_cross_bull or macd_cross_bull) * cross_bonus
+        bear_bonus = (ema_cross_bear or macd_cross_bear) * cross_bonus
 
-            rsi        = round(last["rsi"], 2)
-            ema_fast   = round(last["ema_fast"], 4)
-            ema_slow   = round(last["ema_slow"], 4)
-            price      = round(last["close"], 4)
-            bb_upper   = round(last["bb_upper"], 4)
-            bb_lower   = round(last["bb_lower"], 4)
-            macd_val   = round(last["macd"], 4)
-            macd_sig   = round(last["macd_signal"], 4)
-            macd_cross = (
-                last["macd"] > last["macd_signal"] and
-                prev["macd"] <= prev["macd_signal"]
+        # Confidence: 40 base + 15 per signal + cross bonus
+        bull_conf = 40.0 + bull_score * 15.0 + bull_bonus
+        bear_conf = 40.0 + bear_score * 15.0 + bear_bonus
+
+        # ── Decision ─────────────────────────────────────────────────────────
+        if bull_conf > bear_conf and bull_score >= 2:
+            sl = price * 0.97      # 3% stop loss
+            tp = price * 1.06      # 6% take profit
+            reason = (
+                f"RSI={rsi:.1f} (oversold={rsi < self.RSI_OVERSOLD}) · "
+                f"EMA9>{ema_fast.iloc[-1]:.2f} EMA21>{ema_slow.iloc[-1]:.2f} "
+                f"({'CROSS ▲' if ema_cross_bull else 'BULL'}) · "
+                f"MACD {'CROSS ▲' if macd_cross_bull else 'BULL' if macd_bull else 'BEAR'} · "
+                f"BB: price near lower={near_lower}"
+            )
+            return Signal(
+                pair=pair, action="BUY", confidence=min(bull_conf, 95.0),
+                strategy=self.name, reason=reason,
+                entry_price=price, stop_loss=sl, take_profit=tp,
             )
 
-            # ── منطق القرار (مستلهم من freqtrade) ──
-            buy_signals  = []
-            sell_signals = []
-            confidence   = 50
-
-            # RSI
-            if rsi < self.RSI_BUY_THRESHOLD:
-                buy_signals.append(f"RSI oversold ({rsi})")
-                confidence += 20
-            elif rsi > self.RSI_SELL_THRESHOLD:
-                sell_signals.append(f"RSI overbought ({rsi})")
-                confidence -= 20
-
-            # EMA Trend
-            if ema_fast > ema_slow:
-                buy_signals.append(f"EMA bullish ({ema_fast:.0f}>{ema_slow:.0f})")
-                confidence += 15
-            else:
-                sell_signals.append(f"EMA bearish ({ema_fast:.0f}<{ema_slow:.0f})")
-                confidence -= 15
-
-            # Bollinger Bands
-            if price < bb_lower:
-                buy_signals.append("Price below BB lower")
-                confidence += 15
-            elif price > bb_upper:
-                sell_signals.append("Price above BB upper")
-                confidence -= 15
-
-            # MACD Crossover
-            if macd_cross:
-                buy_signals.append("MACD bullish crossover")
-                confidence += 10
-            elif macd_val < macd_sig:
-                sell_signals.append("MACD bearish")
-                confidence -= 10
-
-            # ── القرار النهائي ──
-            confidence = max(0, min(100, confidence))
-
-            if confidence >= 65 and len(buy_signals) >= 2:
-                signal = "BUY"
-                reason = " | ".join(buy_signals)
-            elif confidence <= 35 and len(sell_signals) >= 2:
-                signal = "SELL"
-                reason = " | ".join(sell_signals)
-            else:
-                signal = "HOLD"
-                reason = "No clear consensus"
-
-            result = {
-                "strategy": self.NAME,
-                "symbol":   symbol,
-                "signal":   signal,
-                "confidence": confidence,
-                "reason":   reason,
-                "indicators": {
-                    "rsi":       rsi,
-                    "ema_fast":  ema_fast,
-                    "ema_slow":  ema_slow,
-                    "bb_upper":  bb_upper,
-                    "bb_lower":  bb_lower,
-                    "price":     price,
-                    "macd":      macd_val,
-                    "macd_sig":  macd_sig,
-                    "macd_cross": macd_cross
-                }
-            }
-
-            log.info(
-                f"[TA Strategy]: {symbol} → {signal} "
-                f"({confidence}%) | RSI:{rsi} | "
-                f"EMA:{ema_fast:.0f}/{ema_slow:.0f}"
+        if bear_conf > bull_conf and bear_score >= 2:
+            sl = price * 1.03
+            tp = price * 0.94
+            reason = (
+                f"RSI={rsi:.1f} (overbought={rsi > self.RSI_OVERBOUGHT}) · "
+                f"EMA9<EMA21 "
+                f"({'CROSS ▼' if ema_cross_bear else 'BEAR'}) · "
+                f"MACD {'CROSS ▼' if macd_cross_bear else 'BEAR' if macd_bear else 'BULL'} · "
+                f"BB: price near upper={near_upper}"
             )
-            return result
+            return Signal(
+                pair=pair, action="SELL", confidence=min(bear_conf, 95.0),
+                strategy=self.name, reason=reason,
+                entry_price=price, stop_loss=sl, take_profit=tp,
+            )
 
-        except Exception as e:
-            log.error(f"[TA Strategy]: Analysis failed — {e}")
-            return self._empty_result(symbol, str(e))
-
-    def _empty_result(self, symbol, reason):
-        return {
-            "strategy":   self.NAME,
-            "symbol":     symbol,
-            "signal":     "HOLD",
-            "confidence": 0,
-            "reason":     reason,
-            "indicators": {}
-        }
+        return self.hold(
+            pair,
+            f"RSI={rsi:.1f} · bull_score={bull_score}/4 · bear_score={bear_score}/4 · no clear edge"
+        )
