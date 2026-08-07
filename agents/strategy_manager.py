@@ -14,9 +14,8 @@ Vote system:
 import logging
 from typing import Optional
 import pandas as pd
-
-from .strategies import REGISTRY
-from .strategies.base_strategy import Signal
+from strategies import REGISTRY
+from strategies.base_strategy import Signal
 
 log = logging.getLogger("SnipBot.StrategyManager")
 
