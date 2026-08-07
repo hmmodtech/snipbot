@@ -1,114 +1,110 @@
 """
-DCA Strategy — Dollar Cost Averaging
-تكمّل Smart DCA الحالي في OctoBot
-تضيف فلتر ذكي: لا تشتري في هبوط قوي
+SnipBot — Smart DCA+ Strategy
+-------------------------------
+Logic: Buy on dips relative to moving average.
+       Scale in when price drops X% from recent high.
+       Exit when price recovers Y% above average cost.
+
+Inspired by OctoBot Smart DCA tentacle.
 """
 
 import pandas as pd
-import pandas_ta as ta
-import logging
-from .base_strategy import BaseStrategy
+import ta.trend
+import ta.momentum
 
-log = logging.getLogger("DCA-Strategy")
+from .base_strategy import BaseStrategy, Signal
 
 
 class DCAStrategy(BaseStrategy):
-    """
-    استراتيجية DCA المحسّنة
-    
-    الفكرة: OctoBot يشتري بـ DCA
-    نحن نضيف فلتر: لا تشتري إذا السوق في هبوط قوي
-    
-    شروط الشراء:
-    ✅ RSI ليس في منطقة هبوط قوي (مش < 20)
-    ✅ السعر ليس في downtrend واضح
-    ✅ Volume طبيعي (مش انهيار)
-    """
 
-    NAME = "Smart DCA+"
-    VERSION = "1.0"
-    TIMEFRAME = "1h"
-    CANDLES_NEEDED = 30
+    name = "Smart DCA+"
+    weight = 1.0
 
-    def analyze(self, df: pd.DataFrame, symbol: str) -> dict:
-        """تحليل DCA المحسّن"""
+    # ── Config ───────────────────────────────────────────────────────────────
+    DIP_THRESHOLD   = 0.04   # buy when price is 4% below MA
+    RECOVERY_TARGET = 0.03   # sell when price is 3% above MA
+    MA_WINDOW       = 50     # 50-period moving average baseline
+    RSI_FLOOR       = 25     # don't buy if RSI this low (potential crash)
+    MIN_ROWS        = 55
 
-        if not self.validate_df(df):
-            return self._empty_result(symbol, "Insufficient data")
+    def analyze(self, pair: str, df: pd.DataFrame) -> Signal:
+        if not self._validate_df(df, self.MIN_ROWS):
+            return self.hold(pair, "Insufficient data for DCA analysis")
 
-        try:
-            # RSI للفلتر
-            df["rsi"] = ta.rsi(df["close"], length=14)
+        closes = df["close"]
+        price  = closes.iloc[-1]
 
-            # EMA للاتجاه
-            df["ema_50"] = ta.ema(df["close"], length=50)
+        # ── Baseline MA ───────────────────────────────────────────────────────
+        ma = ta.trend.SMAIndicator(closes, window=self.MA_WINDOW).sma_indicator()
+        ma_now = ma.iloc[-1]
 
-            # Volume المتوسط
-            df["vol_ma"] = df["volume"].rolling(20).mean()
+        if pd.isna(ma_now):
+            return self.hold(pair, "MA not yet calculable")
 
-            last         = df.iloc[-1]
-            rsi          = round(last["rsi"], 2)
-            price        = round(last["close"], 4)
-            ema_50       = round(last["ema_50"], 4)
-            vol_ratio    = last["volume"] / last["vol_ma"] if last["vol_ma"] > 0 else 1
+        # ── RSI filter (avoid catching falling knives) ────────────────────────
+        rsi = ta.momentum.RSIIndicator(closes, window=14).rsi().iloc[-1]
 
-            warnings     = []
-            confidence   = 70  # DCA افتراضياً آمن
+        # ── Price vs MA ───────────────────────────────────────────────────────
+        pct_from_ma = (price - ma_now) / ma_now   # negative = below MA
 
-            # فلتر الانهيار
-            if rsi < 20:
-                warnings.append(f"Extreme oversold RSI {rsi} — market crash?")
-                confidence -= 40
+        # ── Recent high (20-period) ────────────────────────────────────────────
+        recent_high = closes.iloc[-20:].max()
+        pct_from_high = (price - recent_high) / recent_high  # negative = dip
 
-            # فلتر الاتجاه
-            if price < ema_50 * 0.95:
-                warnings.append("Price 5% below EMA50 — strong downtrend")
-                confidence -= 20
+        # ── EMA trend filter: only buy in uptrend ────────────────────────────
+        ema200 = ta.trend.EMAIndicator(closes, window=min(200, len(closes)//2)).ema_indicator()
+        uptrend = price > ema200.iloc[-1] if not pd.isna(ema200.iloc[-1]) else True
 
-            # فلتر Volume الشاذ
-            if vol_ratio > 3:
-                warnings.append(f"Volume spike {vol_ratio:.1f}x — unusual activity")
-                confidence -= 15
+        # ── DCA BUY condition ─────────────────────────────────────────────────
+        # Price dipped below MA by threshold AND RSI not in crash AND uptrend
+        dip_buy = (
+            pct_from_ma <= -self.DIP_THRESHOLD and
+            rsi > self.RSI_FLOOR and
+            uptrend
+        )
 
-            confidence = max(0, min(100, confidence))
+        # ── DCA SELL condition ────────────────────────────────────────────────
+        # Price recovered above MA by recovery target
+        recovery_sell = pct_from_ma >= self.RECOVERY_TARGET
 
-            if confidence >= 55:
-                signal = "BUY"
-                reason = "DCA conditions met — safe to accumulate"
-            else:
-                signal = "HOLD"
-                reason = " | ".join(warnings)
+        if dip_buy:
+            # Confidence scales with dip depth (deeper dip = more confident DCA buy)
+            dip_pct = abs(pct_from_ma) * 100
+            confidence = min(55.0 + dip_pct * 5, 88.0)
+            sl = price * (1 - self.DIP_THRESHOLD)
+            tp = ma_now * (1 + self.RECOVERY_TARGET)
 
-            result = {
-                "strategy":   self.NAME,
-                "symbol":     symbol,
-                "signal":     signal,
-                "confidence": confidence,
-                "reason":     reason,
-                "indicators": {
-                    "rsi":       rsi,
-                    "ema_50":    ema_50,
-                    "price":     price,
-                    "vol_ratio": round(vol_ratio, 2)
-                }
-            }
-
-            log.info(
-                f"[DCA Strategy]: {symbol} → {signal} "
-                f"({confidence}%) | RSI:{rsi}"
+            return Signal(
+                pair=pair,
+                action="BUY",
+                confidence=confidence,
+                strategy=self.name,
+                reason=(
+                    f"DCA dip entry: price {pct_from_ma*100:.1f}% below MA{self.MA_WINDOW} "
+                    f"(MA=${ma_now:.2f}) · RSI={rsi:.1f} · uptrend={uptrend} · "
+                    f"high-dip={pct_from_high*100:.1f}%"
+                ),
+                entry_price=price,
+                stop_loss=sl,
+                take_profit=tp,
             )
-            return result
 
-        except Exception as e:
-            log.error(f"[DCA Strategy]: Failed — {e}")
-            return self._empty_result(symbol, str(e))
+        if recovery_sell:
+            confidence = min(55.0 + pct_from_ma * 100 * 3, 82.0)
+            return Signal(
+                pair=pair,
+                action="SELL",
+                confidence=confidence,
+                strategy=self.name,
+                reason=(
+                    f"DCA recovery exit: price {pct_from_ma*100:.1f}% above MA{self.MA_WINDOW} "
+                    f"(MA=${ma_now:.2f}) · RSI={rsi:.1f}"
+                ),
+                entry_price=price,
+            )
 
-    def _empty_result(self, symbol, reason):
-        return {
-            "strategy":   self.NAME,
-            "symbol":     symbol,
-            "signal":     "HOLD",
-            "confidence": 0,
-            "reason":     reason,
-            "indicators": {}
-        }
+        return self.hold(
+            pair,
+            f"DCA standby: price {pct_from_ma*100:+.1f}% vs MA · "
+            f"need <-{self.DIP_THRESHOLD*100:.0f}% to enter · RSI={rsi:.1f}"
+        )
