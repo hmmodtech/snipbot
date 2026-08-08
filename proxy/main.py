@@ -238,7 +238,25 @@ def status():
         "octobot": OCTOBOT_URL,
         "time":    datetime.utcnow().isoformat()
     })
-
+@app.route("/api/telegram/send", methods=["POST"])
+def telegram_send():
+    """Dashboard يرسل Telegram عبر الـ Proxy"""
+    import os, requests as req
+    try:
+        data    = request.get_json()
+        message = data.get("message", "")
+        token   = os.getenv("TELEGRAM_TOKEN", "")
+        chat_id = os.getenv("CHAT_ID", "")
+        if not token or not chat_id:
+            return jsonify({"status": "no_token"}), 200
+        r = req.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            data={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
+            timeout=8
+        )
+        return jsonify({"status": "sent", "ok": r.status_code == 200})
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)})
 
 if __name__ == "__main__":
     log.info(f"[SnipBot Proxy]: Starting on port {PORT}")
