@@ -15,7 +15,7 @@ import ta.momentum
 import ta.trend
 import ta.volatility
 
-from .base_strategy import BaseStrategy, Signal
+from base_strategy import BaseStrategy, Signal
 
 
 class TAStrategy(BaseStrategy):
