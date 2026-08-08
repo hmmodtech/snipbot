@@ -12,7 +12,7 @@ from typing import List, Optional
 import pandas as pd
 import ccxt.async_support as ccxt
 
-from .strategy_manager import StrategyManager
+from strategy_manager import StrategyManager
 from .strategies.base_strategy import Signal
 
 log = logging.getLogger("SnipBot.Scanner")
