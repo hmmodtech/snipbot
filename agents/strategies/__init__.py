@@ -5,8 +5,8 @@ Add a new strategy: import it here and add to REGISTRY.
 StrategyManager loads all strategies from REGISTRY automatically.
 """
 
-from .ta_strategy  import TAStrategy
-from .dca_strategy import DCAStrategy
+from ta_strategy  import TAStrategy
+from dca_strategy import DCAStrategy
 
 # ── Strategy Registry ────────────────────────────────────────────────────────
 # Format: { "name": StrategyClass }
