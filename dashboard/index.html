@@ -822,41 +822,68 @@ function loadPortfolioWidget() {
 }
 
 async function fetchExchangeBalance(ex) {
-  // Calls proxy which handles actual ccxt call
   const balEl   = document.getElementById(`pw-bal-${ex.id}`);
   const pnlEl   = document.getElementById(`pw-pnl-${ex.id}`);
   const pairsEl = document.getElementById(`pw-pairs-${ex.id}`);
   const saved   = getExchange(ex.id);
-  const mode    = saved?.mode || 'paper';
+  if (!saved) return;
+
+  const mode = saved.mode || 'paper';
+
+  // Show loading state
+  balEl.textContent   = '—';
+  pnlEl.textContent   = 'Syncing...';
+  pnlEl.style.color   = 'var(--muted)';
+  pairsEl.textContent = '◎ Fetching...';
 
   try {
     const res = await fetch(`${API}/api/exchange_balance`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ exchange: ex.id, mode }),
-      signal: AbortSignal.timeout(8000),
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        exchange: ex.id,
+        api_key:  saved.apiKey  || '',
+        secret:   saved.secret  || '',
+        password: saved.password|| '',
+        mode:     mode,
+      }),
+      signal: AbortSignal.timeout(12000),
     });
 
-    if (res.ok) {
-      const data = await res.json();
-      const total = data.total_usdt || 0;
-      const pnl   = data.pnl || 0;
-      const pairs = data.active_pairs || [];
+    const data = await res.json();
 
-      balEl.textContent   = `$${total.toLocaleString('en',{maximumFractionDigits:0})}`;
-      pnlEl.textContent   = (pnl >= 0 ? '+' : '') + `$${Math.abs(pnl).toFixed(0)} today`;
-      pnlEl.style.color   = pnl >= 0 ? 'var(--neon)' : 'var(--danger)';
-      pairsEl.textContent = pairs.length > 0 ? pairs.join(' · ') : 'No open positions';
-    } else {
-      throw new Error('proxy error');
+    if (!res.ok) {
+      // Auth or exchange error
+      balEl.textContent   = 'Error';
+      pnlEl.textContent   = data.error || 'Check API keys';
+      pnlEl.style.color   = 'var(--danger)';
+      pairsEl.textContent = `⛔ ${data.status || 'error'}`;
+      return;
     }
-  } catch {
-    // Demo values when proxy not available
-    const demo = { kucoin:10000, binance:5000, bybit:3000, okx:2000 };
-    balEl.textContent   = `$${(demo[ex.id]||0).toLocaleString()}`;
-    pnlEl.textContent   = mode === 'paper' ? 'Paper Trading' : 'Real Trading';
-    pnlEl.style.color   = mode === 'paper' ? 'var(--amber)' : 'var(--neon)';
-    pairsEl.textContent = '◎ Connect proxy to fetch live data';
+
+    const total = data.total_usdt    || 0;
+    const free  = data.free_usdt     || 0;
+    const pnl   = data.pnl           || 0;
+    const pairs = data.active_pairs  || [];
+
+    balEl.textContent   = `$${total.toLocaleString('en',{maximumFractionDigits:0})}`;
+    balEl.style.color   = '#fff';
+    pnlEl.textContent   = pnl !== 0
+      ? (pnl >= 0 ? '+' : '') + `$${Math.abs(pnl).toFixed(2)} PnL`
+      : `$${free.toLocaleString('en',{maximumFractionDigits:0})} free`;
+    pnlEl.style.color   = pnl > 0 ? 'var(--neon)' : pnl < 0 ? 'var(--danger)' : 'var(--muted)';
+    pairsEl.textContent = pairs.length > 0 ? pairs.join(' · ') : 'No open positions';
+
+    addFeedItem(
+      `🔎 [Sniper Engine]: ${ex.name} balance synced — $${total.toLocaleString('en',{maximumFractionDigits:0})} USDT · ${mode.toUpperCase()}`,
+      'info'
+    );
+
+  } catch(e) {
+    balEl.textContent   = '—';
+    pnlEl.textContent   = 'Proxy offline';
+    pnlEl.style.color   = 'var(--muted)';
+    pairsEl.textContent = '◎ Start proxy service to fetch live data';
   }
 }
 
