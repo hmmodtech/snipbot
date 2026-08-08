@@ -166,7 +166,7 @@ nav{padding:12px 10px;flex:1;overflow-y:auto;}
 <!-- CONFIG — يغيّر المستخدم الـ URL هنا -->
 <script>
 const OCTOBOT_API = 'https://snipbot-x.up.railway.app';
-// REFRESH_MS defined in CONFIG block below
+const REFRESH_MS  = 8000; // تحديث كل 8 ثواني
 </script>
 
 <!-- STATUS BAR -->
@@ -369,11 +369,8 @@ const OCTOBOT_API = 'https://snipbot-x.up.railway.app';
 
 <script>
 /* ── CONFIG ── */
-// SnipBot API Proxy URL — يتصل بهذا بدل OctoBot مباشرة
-const API = typeof SNIPBOT_PROXY !== 'undefined'
-  ? SNIPBOT_PROXY
-  : 'https://snipbot-proxy.up.railway.app';
-const REFRESH_MS = 8000;
+// غيّر هذا للرابط الحقيقي لـ SnipBot Engine
+const API = typeof OCTOBOT_API !== 'undefined' ? OCTOBOT_API : 'https://snipbot-x.up.railway.app';
 
 /* ── CLOCK ── */
 let upSec = 0;
@@ -426,53 +423,16 @@ async function apiFetch(path){
 
 /* ── PORTFOLIO ── */
 async function loadPortfolio(){
-  const data = await apiFetch('/api/portfolio');
-  const isDemo = !data || data.status === 'demo';
-
-  if(isDemo){ setApiStatus(false); loadMockPortfolio(); return; }
+  const data=await apiFetch('/api/portfolio');
+  if(!data){ setApiStatus(false); loadMockPortfolio(); return; }
   setApiStatus(true);
-
   try{
-    // OctoBot 2.0.16 response normalization
-    const total = parseFloat(
-      data.total_portfolio_value ||
-      data.portfolio_value ||
-      data.total ||
-      0
-    );
-
-    // Extract USDT free (reserve/idle capital)
-    const portfolio = data.portfolio || {};
-    const usdtFree = parseFloat(
-      (portfolio.USDT && portfolio.USDT.free) ||
-      (portfolio.usdt && portfolio.usdt.free) ||
-      0
-    );
-    const reservePct = total > 0 ? ((usdtFree / total) * 100).toFixed(1) : '—';
-
-    // Profitability
-    const profitData = data.profitability || {};
-    const profitPct  = parseFloat(profitData.profitability || 0).toFixed(2);
-    const winRate    = parseFloat(profitData.win_rate || 0).toFixed(1);
-    const tradeCount = profitData.trades_count || 0;
-
-    // Update KPI cards
-    document.getElementById('ov-capital').textContent = `$${total.toLocaleString('en',{maximumFractionDigits:0})}`;
-    document.getElementById('ov-capital-d').textContent = `↑ ${profitPct}% total return`;
-
-    document.getElementById('ov-reserve').textContent = `$${usdtFree.toLocaleString('en',{maximumFractionDigits:0})}`;
-    document.getElementById('ov-reserve-d').textContent = `${reservePct}% idle capital`;
-
-    document.getElementById('ov-precision').textContent = `${winRate}%`;
-    document.getElementById('ov-precision-d').textContent = `↑ ${tradeCount} shots fired`;
-
-    addFeedItem(
-      `🔎 [Sniper Engine]: Portfolio sync complete. Capital: $${total.toLocaleString('en',{maximumFractionDigits:0})} USDT. Win rate: ${winRate}%.`,
-      'info'
-    );
-  } catch(e){
-    loadMockPortfolio();
-  }
+    const total=data.total_portfolio_value||data.portfolio_value||0;
+    const ref=data.reference_market||'USDT';
+    document.getElementById('ov-capital').textContent=`$${Number(total).toLocaleString('en',{maximumFractionDigits:0})}`;
+    document.getElementById('ov-capital-d').textContent='↑ Live from OctoBot';
+    addFeedItem('🔎 [Sniper Engine]: Portfolio sync complete. Capital: $'+Number(total).toLocaleString()+'','info');
+  } catch(e){ loadMockPortfolio(); }
 }
 
 function loadMockPortfolio(){
@@ -490,45 +450,28 @@ function loadMockPortfolio(){
 
 /* ── TRADES ── */
 async function loadTrades(){
-  const data = await apiFetch('/api/trades');
-  const tbody = document.getElementById('snipes-body');
-
-  const trades = data && data.trades && data.trades.length > 0
-    ? data.trades
-    : null;
-
-  if(!trades){ loadMockTrades(); return; }
-
-  document.getElementById('snipes-count-chip').textContent = trades.length + ' TARGETS';
-  tbody.innerHTML = trades.slice(0, 6).map(t => {
-    const pnl = parseFloat(t.realized_pnl || 0);
-    const pnlStr = (pnl >= 0 ? '+' : '') + `$${Math.abs(pnl).toFixed(0)}`;
-    const pnlClass = pnl >= 0 ? 'up' : 'dn';
-    const rawSide = (t.side || 'buy').toUpperCase();
-    const side = rawSide === 'BUY' || rawSide === 'LONG' ? 'LONG' : 'SHORT';
-    const sideClass = side === 'LONG' ? 'long' : 'short';
-    const sideArrow = side === 'LONG' ? '↑' : '↓';
-    const entryPrice = parseFloat(t.price || 0).toFixed(2);
-    const curPrice   = parseFloat(t.current_price || t.price || 0).toFixed(2);
-    const sym = t.symbol || '???';
-    const statusCls  = pnl >= 0 ? 's-locked' : 's-track';
-    const statusTxt  = pnl >= 0 ? '🎯 LOCKED' : '◎ TRACKING';
-
+  const data=await apiFetch('/api/trades');
+  const tbody=document.getElementById('snipes-body');
+  if(!data||!data.trades||data.trades.length===0){
+    loadMockTrades(); return;
+  }
+  document.getElementById('snipes-count-chip').textContent=data.trades.length+' TARGETS';
+  tbody.innerHTML=data.trades.slice(0,6).map(t=>{
+    const pnl=t.realized_pnl||0;
+    const pnlStr=(pnl>=0?'+':'')+`$${Math.abs(pnl).toFixed(0)}`;
+    const pnlClass=pnl>=0?'up':'dn';
+    const side=t.side?.toUpperCase()==='BUY'?'LONG':'SHORT';
+    const sideClass=side==='LONG'?'long':'short';
     return `<tr>
-      <td><span class="pair">${sym}</span></td>
-      <td><span class="${sideClass}">${side} ${sideArrow}</span></td>
-      <td>${entryPrice}</td>
-      <td>${curPrice}</td>
+      <td><span class="pair">${t.symbol||'—'}</span></td>
+      <td><span class="${sideClass}">${side}</span></td>
+      <td>${t.price?.toFixed(2)||'—'}</td>
+      <td>${t.current_price?.toFixed(2)||'—'}</td>
       <td class="${pnlClass}">${pnlStr}</td>
-      <td><span class="${statusCls}">${statusTxt}</span></td>
-      <td><button class="ab exit" onclick="showToast('⚡ [SnipBot]: ${sym} exit triggered')">EXIT</button></td>
+      <td><span class="s-locked">🎯 LOCKED</span></td>
+      <td><button class="ab exit" onclick="showToast('⚡ [SnipBot]: ${t.symbol} exit triggered')">EXIT</button></td>
     </tr>`;
   }).join('');
-
-  // Update open snipes count on KPI card
-  document.getElementById('ov-snipes').textContent = trades.length;
-  const pnlTotal = trades.reduce((s, t) => s + parseFloat(t.realized_pnl || 0), 0);
-  document.getElementById('ov-pnl').textContent = (pnlTotal >= 0 ? '+' : '') + `$${Math.abs(pnlTotal).toFixed(0)}`;
 }
 
 function loadMockTrades(){
@@ -551,58 +494,103 @@ function loadMockTrades(){
 }
 
 /* ── AGENTS ── */
-const AGENTS=[
-  {n:'Sniper Engine',  r:'LIQUIDITY · BREAKOUT',  c:88, clr:'var(--neon)',   v:'FIRE READY'},
-  {n:'TA Analyst',     r:'INDICATORS · PA',        c:82, clr:'var(--amber)',  v:'BULLISH'},
-  {n:'Judge Agent',    r:'DECISION MAKER',         c:64, clr:'var(--amber)',  v:'AWAITING'},
-  {n:'Risk Agent',     r:'EXPOSURE CONTROL',       c:91, clr:'var(--green)',  v:'SAFE'},
-  {n:'Trigger Agent',  r:'ENTRY · EXIT',           c:76, clr:'var(--neon)',   v:'ARMED'},
-  {n:'Sentiment AI',   r:'SOCIAL · NEWS',          c:55, clr:'var(--muted)',  v:'NEUTRAL'},
-];
-function loadAgents(){
-  document.getElementById('agents-chip').textContent='5/6 ACTIVE';
-  document.getElementById('agents-grid').innerHTML=AGENTS.map(a=>`
+/* ── AGENTS — LIVE FROM SNIPBOT AGENTS SERVICE ── */
+const AGENTS_URL = typeof SNIPBOT_AGENTS !== 'undefined'
+  ? SNIPBOT_AGENTS
+  : 'https://snipbot-agents.up.railway.app';
+
+function agentCard(name, role, conf, clr, verdict){
+  return `
     <div class="ac">
-      <div class="an">${a.n}</div>
-      <div class="ar">${a.r}</div>
-      <div class="cb"><div class="cf" style="width:${a.c}%;background:${a.clr}"></div></div>
-      <div class="av"><div class="vd" style="background:${a.clr};box-shadow:0 0 4px ${a.clr}"></div>
-      <span style="color:var(--muted)">Conf:</span>
-      <span style="color:${a.clr}">${a.c}% — ${a.v}</span></div>
-    </div>`).join('');
+      <div class="an">${name}</div>
+      <div class="ar">${role}</div>
+      <div class="cb"><div class="cf" style="width:${conf}%;background:${clr}"></div></div>
+      <div class="av">
+        <div class="vd" style="background:${clr};box-shadow:0 0 4px ${clr}"></div>
+        <span style="color:var(--muted)">Conf:</span>
+        <span style="color:${clr}">${conf}% — ${verdict}</span>
+      </div>
+    </div>`;
+}
+
+async function loadAgents(){
+  const chip = document.getElementById('agents-chip');
+  const grid = document.getElementById('agents-grid');
+  let data = null;
+
+  try {
+    const res = await fetch(`${AGENTS_URL}/status`, {signal: AbortSignal.timeout(5000)});
+    if(res.ok) data = await res.json();
+  } catch(e) {}
+
+  if(!data || !data.pairs){
+    chip.textContent = 'DEMO MODE';
+    chip.style.background = 'var(--amber)';
+    grid.innerHTML = [
+      agentCard('TA Analyst',  'RSI · EMA · MACD · BB',       82, 'var(--amber)', 'BULLISH'),
+      agentCard('Smart DCA+',  'MA DIP ENTRY · RECOVERY EXIT', 71, 'var(--neon)',  'STANDBY'),
+      agentCard('Consensus',   'WEIGHTED VOTE · 62% THRESHOLD', 0, 'var(--muted)', 'AWAITING'),
+    ].join('');
+    return;
+  }
+
+  const pairs  = data.pairs  || {};
+  const active = data.active_signals || [];
+  const count  = active.length;
+
+  chip.textContent = count > 0 ? `${count} SIGNAL${count>1?'S':''} ACTIVE` : 'SCANNING';
+  chip.style.background = count > 0 ? 'var(--neon)' : '';
+  chip.style.color      = count > 0 ? '#000' : '';
+
+  const pairList = Object.entries(pairs);
+  const avgConf  = pairList.length > 0
+    ? Math.round(pairList.reduce((s,[,r])=> s+(r.confidence||0), 0) / pairList.length)
+    : 0;
+  const buyCount  = pairList.filter(([,r])=> r.action==='BUY').length;
+  const sellCount = pairList.filter(([,r])=> r.action==='SELL').length;
+  const taVerdict = buyCount > sellCount ? 'BULLISH' : sellCount > buyCount ? 'BEARISH' : 'NEUTRAL';
+  const taClr     = buyCount > sellCount ? 'var(--neon)' : sellCount > buyCount ? 'var(--danger)' : 'var(--amber)';
+
+  const consensusConf    = count > 0 ? Math.round(active.reduce((s,a)=>s+a.confidence,0)/active.length) : 0;
+  const consensusVerdict = count > 0 ? active.map(a=>a.pair+' '+a.action).join(' · ') : 'NO CONSENSUS';
+  const consensusClr     = count > 0 ? 'var(--neon)' : 'var(--muted)';
+
+  const lastScan = data.last_scan ? new Date(data.last_scan).toLocaleTimeString('en-GB') : '—';
+
+  const pairBreakdown = pairList.map(([pair, r])=>{
+    const icon = r.action==='BUY'?'▲': r.action==='SELL'?'▼':'◎';
+    const clr  = r.action==='BUY'?'var(--neon)': r.action==='SELL'?'var(--danger)':'var(--muted)';
+    return `<span style="color:${clr};font-size:9px;margin-right:8px">${icon} ${pair} ${r.confidence||0}%</span>`;
+  }).join('');
+
+  grid.innerHTML =
+    agentCard('TA Analyst',  `RSI · EMA · MACD · BB · ${lastScan}`, avgConf, taClr, taVerdict) +
+    agentCard('Smart DCA+',  'MA DIP ENTRY · RECOVERY EXIT',          avgConf, taClr, taVerdict) +
+    agentCard('Consensus',   `VOTE · THRESHOLD ${data.system?.min_confidence||62}%`, consensusConf, consensusClr, consensusVerdict) +
+    `<div class="ac" style="grid-column:1/-1;padding:8px 12px">
+       <div style="font-size:9px;color:var(--muted);margin-bottom:4px">PAIR BREAKDOWN — Scan #${data.scan_count||0}</div>
+       <div>${pairBreakdown}</div>
+     </div>`;
+
+  if(count > 0)
+    addFeedItem(`🎯 [SnipBot]: ${count} signal${count>1?'s':''} active — ${consensusVerdict}`, 'executed');
 }
 
 /* ── RISK METERS ── */
 async function loadRisk(){
-  const data = await apiFetch('/api/profitability');
-
-  // Use live data if available, fall back to demo values
-  const winRate  = data ? Math.round((data.win_rate || 0) * 100) / 100 : 67;
-  const trades   = data ? (data.trades_count || 0) : 38;
-  const profit   = data ? parseFloat(data.profitability || 0).toFixed(1) : 1.6;
-  const wins     = data ? (data.wins || 0) : 26;
-  const losses   = data ? (data.losses || 0) : 12;
-
-  const winPct   = winRate > 0 ? Math.min(winRate, 100) : 67;
-  const riskLevel = winPct >= 60 ? 'LOW RISK' : winPct >= 45 ? 'MEDIUM RISK' : 'HIGH RISK';
-  const riskClr  = winPct >= 60 ? 'var(--neon)' : winPct >= 45 ? 'var(--amber)' : 'var(--danger)';
-
-  document.getElementById('risk-level').textContent = riskLevel;
-  document.getElementById('risk-level').style.color = riskClr;
-
-  const RISKS = [
-    {l:'Win Rate',   v:`${winPct.toFixed(1)}%`, pct: winPct,   clr: winPct>=60?'var(--neon)':'var(--amber)'},
-    {l:'Profitability', v:`${profit}%`,          pct: Math.min(Math.abs(profit)*5,100), clr:'var(--neon)'},
-    {l:'Trades',     v:`${trades}`,              pct: Math.min(trades, 100),            clr:'var(--amber)'},
-    {l:'Wins',       v:`${wins}`,                pct: trades>0?Math.round(wins/trades*100):0, clr:'var(--green)'},
-    {l:'Losses',     v:`${losses}`,              pct: trades>0?Math.round(losses/trades*100):0, clr:'var(--danger)'},
+  const RISKS=[
+    {l:'Drawdown', v:18, pct:18, clr:'var(--neon)',   vc:'up'},
+    {l:'Exposure', v:42, pct:42, clr:'var(--amber)',  vc:'amber'},
+    {l:'Volatility',v:29,pct:29,clr:'var(--green)',  vc:'up'},
+    {l:'Sharpe',   v:'1.74',pct:74,clr:'var(--neon)',vc:'up'},
+    {l:'Win Rate', v:'67%',pct:67,clr:'var(--neon)', vc:'up'},
   ];
-
-  document.getElementById('risk-meters').innerHTML = RISKS.map(r => `
+  document.getElementById('risk-level').textContent='LOW RISK';
+  document.getElementById('risk-meters').innerHTML=RISKS.map(r=>`
     <div class="rr">
       <div class="rl">${r.l}</div>
       <div class="rb"><div class="rf" style="width:${r.pct}%;background:${r.clr}"></div></div>
-      <div class="rv" style="color:${r.clr}">${r.v}</div>
+      <div class="rv" style="color:${r.clr}">${typeof r.v==='number'?r.v+'%':r.v}</div>
     </div>`).join('');
 }
 
