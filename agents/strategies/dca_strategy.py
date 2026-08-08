@@ -12,7 +12,7 @@ import pandas as pd
 import ta.trend
 import ta.momentum
 
-from .base_strategy import BaseStrategy, Signal
+from base_strategy import BaseStrategy, Signal
 
 
 class DCAStrategy(BaseStrategy):
