@@ -1,131 +1,116 @@
 """
-Notifier — نظام الإشعارات
-Telegram + Dashboard بشخصية القناص
+SnipBot — Telegram Notifier
+-----------------------------
+Sends sniper-personality alerts to Telegram channel/chat.
+Uses python-telegram-bot v20 (async).
+All message formats follow SNIPBOT_INSTRUCTIONS.md mandatory format.
 """
 
-import requests
 import logging
-import os
-from datetime import datetime
+import asyncio
+from typing import Optional
+from telegram import Bot
+from telegram.error import TelegramError
 
-log = logging.getLogger("Notifier")
+from .strategies.base_strategy import Signal
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
-CHAT_ID        = os.getenv("CHAT_ID", "")
-PROXY_URL      = os.getenv("PROXY_URL", "")
+log = logging.getLogger("SnipBot.Notifier")
 
 
 class Notifier:
 
-    def send_telegram(self, message: str) -> bool:
-        """إرسال رسالة Telegram"""
-        if not TELEGRAM_TOKEN or not CHAT_ID:
-            log.warning("[Notifier]: Telegram not configured")
-            return False
+    def __init__(self, token: str, chat_id: str):
+        if not token or not chat_id:
+            raise ValueError("TELEGRAM_TOKEN and TELEGRAM_CHAT_ID are required")
+        self.bot     = Bot(token=token)
+        self.chat_id = chat_id
+
+    async def send(self, text: str) -> bool:
+        """Send raw message to Telegram."""
         try:
-            url  = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-            resp = requests.post(url, data={
-                "chat_id":    CHAT_ID,
-                "text":       message,
-                "parse_mode": "HTML"
-            }, timeout=10)
-            success = resp.status_code == 200
-            if success:
-                log.info("[Notifier]: Telegram sent ✅")
-            return success
-        except Exception as e:
-            log.error(f"[Notifier]: Telegram failed — {e}")
+            await self.bot.send_message(
+                chat_id=self.chat_id,
+                text=text,
+                parse_mode="HTML",
+            )
+            return True
+        except TelegramError as e:
+            log.error(f"[Notifier] Telegram send failed: {e}")
             return False
 
-    def format_signal(self, result: dict) -> str:
-        """تنسيق رسالة الإشارة بشخصية القناص"""
-        signal  = result.get("signal", "HOLD")
-        symbol  = result.get("symbol", "—")
-        conf    = result.get("confidence", 0)
-        reason  = result.get("reason", "—")
-        buy_pct = result.get("buy_pct", 0)
-        sel_pct = result.get("sell_pct", 0)
-        now     = datetime.utcnow().strftime("%H:%M UTC")
+    # ── Mandatory SnipBot message formats ─────────────────────────────────────
 
-        emoji_map = {
-            "BUY":  "🎯",
-            "SELL": "⚡",
-            "HOLD": "◎"
-        }
-        action_map = {
-            "BUY":  "TARGET ACQUIRED",
-            "SELL": "EXIT SIGNAL",
-            "HOLD": "STANDBY"
-        }
-
-        emoji  = emoji_map.get(signal, "◎")
-        action = action_map.get(signal, "STANDBY")
-
-        # تفاصيل كل استراتيجية
-        details_text = ""
-        for d in result.get("details", []):
-            s_name = d.get("strategy", "—")
-            s_sig  = d.get("signal", "—")
-            s_conf = d.get("confidence", 0)
-            details_text += f"\n  • {s_name}: {s_sig} ({s_conf}%)"
+    async def target_acquired(self, signal: Signal) -> bool:
+        """🎯 Target acquired alert — BUY signal."""
+        price_str = f"${signal.entry_price:,.2f}" if signal.entry_price else "market"
+        sl_str    = f"${signal.stop_loss:,.2f}"   if signal.stop_loss   else "—"
+        tp_str    = f"${signal.take_profit:,.2f}" if signal.take_profit else "—"
 
         msg = (
-            f"{emoji} <b>[SnipBot]: {action}</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"🎯 <b>Target:</b> {symbol}\n"
-            f"📊 <b>Signal:</b> {signal}\n"
-            f"💯 <b>Confidence:</b> {conf:.0f}%\n"
-            f"🗳 <b>Votes:</b> BUY {buy_pct:.0f}% | SELL {sel_pct:.0f}%\n"
-            f"⏰ <b>Time:</b> {now}\n"
-            f"\n<b>📡 Strategy Radar:</b>{details_text}\n"
-            f"\n<b>📋 Reason:</b>\n{reason}\n"
-            f"\n<i>◎ [SnipBot]: Precision Trading OS</i>"
+            f"🎯 <b>[SnipBot]</b>: Target acquired on <b>{signal.pair}</b>.\n"
+            f"Price at major support. Liquidity scan complete. Trigger armed.\n\n"
+            f"<b>Entry:</b> {price_str}\n"
+            f"<b>Stop Loss:</b> {sl_str}\n"
+            f"<b>Take Profit:</b> {tp_str}\n"
+            f"<b>Confidence:</b> {signal.confidence:.1f}%\n"
+            f"<b>Agent:</b> {signal.strategy}\n\n"
+            f"<i>{signal.reason[:120]}</i>"
         )
-        return msg
+        return await self.send(msg)
 
-    def notify_signal(self, result: dict, min_confidence: int = 65):
-        """
-        يرسل إشعار فقط لو الإشارة قوية
-        """
-        signal = result.get("signal", "HOLD")
-        conf   = result.get("confidence", 0)
-
-        if signal == "HOLD":
-            return  # لا نرسل HOLD
-
-        if conf < min_confidence:
-            log.info(
-                f"[Notifier]: Signal skipped — "
-                f"confidence {conf}% < {min_confidence}%"
-            )
-            return
-
-        msg = self.format_signal(result)
-        self.send_telegram(msg)
-
-    def send_startup(self, symbols: list, strategies: list):
-        """رسالة بدء التشغيل"""
+    async def execution_fired(self, signal: Signal, side: str, price: float) -> bool:
+        """⚡ Execution alert — order fired."""
         msg = (
-            "🎯 <b>[SnipBot]: System Online</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"📡 <b>Strategies:</b> {' | '.join(strategies)}\n"
-            f"🎯 <b>Targets:</b> {' | '.join(symbols)}\n"
-            "⚡ <b>Mode:</b> Paper Trading\n"
-            "◎ Precision Trading OS — Armed & Ready"
+            f"⚡ <b>[SnipBot Execution]</b>: "
+            f"<b>{signal.pair}</b> {side} fired @ <b>${price:,.2f}</b>.\n"
+            f"Agent: {signal.strategy}. "
+            f"Confidence: {signal.confidence:.1f}%."
         )
-        self.send_telegram(msg)
+        return await self.send(msg)
 
-    def send_summary(self, all_results: list):
-        """ملخص دوري لكل الأزواج"""
-        now  = datetime.utcnow().strftime("%H:%M UTC")
-        lines = [f"📊 <b>[SnipBot Market Scan]</b> — {now}\n━━━━━━━━━━━━━━━━━━━━"]
+    async def abort(self) -> bool:
+        """⛔ Emergency abort alert."""
+        msg = (
+            "⛔ <b>[SnipBot ABORT]</b>: Emergency halt executed. "
+            "All triggers suspended."
+        )
+        return await self.send(msg)
 
-        for r in all_results:
-            symbol = r.get("symbol", "—")
-            signal = r.get("signal", "HOLD")
-            conf   = r.get("confidence", 0)
-            emoji  = "🎯" if signal == "BUY" else "⚡" if signal == "SELL" else "◎"
-            lines.append(f"{emoji} {symbol}: <b>{signal}</b> ({conf:.0f}%)")
+    async def tracking(self, pair: str) -> bool:
+        """◎ Surveillance alert — no trigger yet."""
+        msg = (
+            f"◎ <b>[SnipBot Tracking]</b>: <b>{pair}</b> under surveillance "
+            f"— awaiting breakout confirmation."
+        )
+        return await self.send(msg)
 
-        lines.append("\n<i>◎ [SnipBot]: Precision Trading OS</i>")
-        self.send_telegram("\n".join(lines))
+    async def scan_summary(self, scanned: int, signals: int, pairs: list) -> bool:
+        """🔎 Scan complete summary."""
+        pairs_str = " · ".join(pairs) if pairs else "none"
+        msg = (
+            f"🔎 <b>[Sniper Engine]</b>: Order book scan complete.\n"
+            f"Pairs scanned: <b>{scanned}</b> · "
+            f"Signals found: <b>{signals}</b>\n"
+            f"Active: {pairs_str}"
+        )
+        return await self.send(msg)
+
+    async def market_snippet(self, sector: str, momentum: str, timeframe: str) -> bool:
+        """📊 Market snippet alert."""
+        msg = (
+            f"📊 <b>[SnipBot Market Snippet]</b>: "
+            f"{sector} showing <b>{momentum}</b> over last {timeframe}."
+        )
+        return await self.send(msg)
+
+    async def sell_signal(self, signal: Signal) -> bool:
+        """🎯 SELL/exit signal alert."""
+        price_str = f"${signal.entry_price:,.2f}" if signal.entry_price else "market"
+        msg = (
+            f"🎯 <b>[SnipBot]</b>: Exit trigger on <b>{signal.pair}</b>.\n"
+            f"Price: {price_str} · "
+            f"Confidence: {signal.confidence:.1f}% · "
+            f"Agent: {signal.strategy}\n\n"
+            f"<i>{signal.reason[:120]}</i>"
+        )
+        return await self.send(msg)
