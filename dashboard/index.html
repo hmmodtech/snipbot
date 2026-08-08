@@ -449,29 +449,56 @@ function loadMockPortfolio(){
 }
 
 /* ── TRADES ── */
-async function loadTrades(){
-  const data=await apiFetch('/api/trades');
-  const tbody=document.getElementById('snipes-body');
-  if(!data||!data.trades||data.trades.length===0){
-    loadMockTrades(); return;
-  }
-  document.getElementById('snipes-count-chip').textContent=data.trades.length+' TARGETS';
-  tbody.innerHTML=data.trades.slice(0,6).map(t=>{
-    const pnl=t.realized_pnl||0;
-    const pnlStr=(pnl>=0?'+':'')+`$${Math.abs(pnl).toFixed(0)}`;
-    const pnlClass=pnl>=0?'up':'dn';
-    const side=t.side?.toUpperCase()==='BUY'?'LONG':'SHORT';
-    const sideClass=side==='LONG'?'long':'short';
-    return `<tr>
-      <td><span class="pair">${t.symbol||'—'}</span></td>
-      <td><span class="${sideClass}">${side}</span></td>
-      <td>${t.price?.toFixed(2)||'—'}</td>
-      <td>${t.current_price?.toFixed(2)||'—'}</td>
-      <td class="${pnlClass}">${pnlStr}</td>
-      <td><span class="s-locked">🎯 LOCKED</span></td>
-      <td><button class="ab exit" onclick="showToast('⚡ [SnipBot]: ${t.symbol} exit triggered')">EXIT</button></td>
-    </tr>`;
-  }).join('');
+async function loadTrades() {
+    const tbody = document.getElementById('snipes-body');
+    const data  = await apiFetch('/api/trades');
+
+    // إذا ما في بيانات أو الـ trades فارغة — Mock
+    if (!data || !data.trades || data.trades.length === 0) {
+        loadMockTrades();
+        return;
+    }
+
+    setApiStatus(true);
+    const recent = data.trades.slice(0, 6);
+    document.getElementById('snipes-count-chip').textContent =
+        data.count + ' TARGETS';
+
+    tbody.innerHTML = recent.map(t => {
+        const isBuy    = String(t.type || '').includes('BUY');
+        const side     = isBuy ? 'LONG' : 'SHORT';
+        const sideClass = isBuy ? 'long' : 'short';
+
+        // ── السعر بأمان ──
+        const rawPrice = t.price ?? t.entry_price ?? 0;
+        const price    = parseFloat(rawPrice) || 0;
+        const priceStr = price > 0 ? '$' + price.toLocaleString() : '—';
+
+        // ── التكلفة ──
+        const cost    = parseFloat(t.cost ?? t.ref_market_cost ?? 0) || 0;
+        const costStr = '$' + cost.toFixed(2);
+
+        // ── التاريخ ──
+        const dateStr = t.date
+            ? String(t.date).split(' ')[1] || t.date
+            : '—';
+
+        return `<tr>
+            <td><span class="pair">${t.symbol || '—'}</span></td>
+            <td><span class="${sideClass}">${side}</span></td>
+            <td style="font-family:var(--mono);font-size:10px">${priceStr}</td>
+            <td style="font-family:var(--mono);font-size:10px;
+                       color:var(--muted)">${dateStr}</td>
+            <td class="up">${costStr}</td>
+            <td><span class="${isBuy ? 's-locked' : 's-track'}">
+                ${isBuy ? '🎯 LOCKED' : '◎ SOLD'}
+            </span></td>
+            <td><button class="ab exit"
+                onclick="showToast('⚡ ${t.symbol} — ${t.type}')">
+                INFO
+            </button></td>
+        </tr>`;
+    }).join('');
 }
 
 function loadMockTrades(){
