@@ -1,10 +1,11 @@
 """
-SnipBot API Proxy — v3 Fixed
+SnipBot API Proxy — v4
 """
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import requests
+import ccxt
 import os
 import logging
 from datetime import datetime
@@ -65,7 +66,6 @@ def health():
 
 @app.route("/api/portfolio")
 def portfolio():
-    """بيانات المحفظة"""
     try:
         trades_list = get_trades()
         orders_list = get_orders()
@@ -77,13 +77,10 @@ def portfolio():
         total_sold   = sum(float(t.get("cost", 0)) for t in sell_trades)
         pnl          = round(total_sold - total_bought, 4)
 
-        locked = sum(float(o.get("cost", 0)) for o in orders_list)
-        locked = round(locked, 2)
-
-        # رأس المال الأساسي $10,000
+        locked    = round(sum(float(o.get("cost", 0)) for o in orders_list), 2)
         BASE_CAPITAL = 10000.0
-        net_spent    = round(total_bought - total_sold, 2)
-        free_usdt    = round(BASE_CAPITAL - net_spent - locked, 2)
+        net_spent = round(total_bought - total_sold, 2)
+        free_usdt = round(BASE_CAPITAL - net_spent - locked, 2)
 
         return jsonify({
             "source":                "live",
@@ -114,20 +111,10 @@ def portfolio():
 
 @app.route("/api/trades")
 def trades():
-    """الصفقات المنجزة"""
     try:
         data = get_trades()
-        # ترتيب من الأحدث
-        sorted_trades = sorted(
-            data,
-            key=lambda x: x.get("time", 0),
-            reverse=True
-        )
-        return jsonify({
-            "source": "live",
-            "count":  len(sorted_trades),
-            "trades": sorted_trades
-        })
+        sorted_trades = sorted(data, key=lambda x: x.get("time", 0), reverse=True)
+        return jsonify({"source": "live", "count": len(sorted_trades), "trades": sorted_trades})
     except Exception as e:
         log.error(f"[Proxy] trades error: {e}")
         return jsonify({"source": "error", "count": 0, "trades": []})
@@ -135,14 +122,9 @@ def trades():
 
 @app.route("/api/orders")
 def orders():
-    """الأوامر المفتوحة"""
     try:
         data = get_orders()
-        return jsonify({
-            "source": "live",
-            "count":  len(data),
-            "orders": data
-        })
+        return jsonify({"source": "live", "count": len(data), "orders": data})
     except Exception as e:
         log.error(f"[Proxy] orders error: {e}")
         return jsonify({"source": "error", "count": 0, "orders": []})
@@ -150,7 +132,6 @@ def orders():
 
 @app.route("/api/summary")
 def summary():
-    """ملخص شامل"""
     try:
         trades_list = get_trades()
         orders_list = get_orders()
@@ -168,10 +149,10 @@ def summary():
         return jsonify({
             "source": "live",
             "portfolio": {
-                "total":      10000.0,
-                "free_usdt":  10000.0,
-                "pnl":        round(pnl, 4),
-                "pnl_pct":    round((pnl / 10000) * 100, 3)
+                "total":     10000.0,
+                "free_usdt": 10000.0,
+                "pnl":       round(pnl, 4),
+                "pnl_pct":   round((pnl / 10000) * 100, 3)
             },
             "activity": {
                 "total_trades": len(trades_list),
@@ -230,7 +211,6 @@ def agents_status():
     })
 
 
-# ── /status للـ Agents service ──
 @app.route("/status")
 def status():
     return jsonify({
@@ -238,10 +218,10 @@ def status():
         "octobot": OCTOBOT_URL,
         "time":    datetime.utcnow().isoformat()
     })
+
+
 @app.route("/api/telegram/send", methods=["POST"])
 def telegram_send():
-    """Dashboard يرسل Telegram عبر الـ Proxy"""
-    import os, requests as req
     try:
         data    = request.get_json()
         message = data.get("message", "")
@@ -249,7 +229,7 @@ def telegram_send():
         chat_id = os.getenv("CHAT_ID", "")
         if not token or not chat_id:
             return jsonify({"status": "no_token"}), 200
-        r = req.post(
+        r = requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
             data={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
             timeout=8
@@ -257,6 +237,121 @@ def telegram_send():
         return jsonify({"status": "sent", "ok": r.status_code == 200})
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)})
+
+
+# ══════════════════════════════════════════════════════════════════
+# NEW: Multi-Exchange Balance
+# POST /api/exchange_balance
+# Body: { exchange, api_key, secret, password, mode }
+# ══════════════════════════════════════════════════════════════════
+@app.route("/api/exchange_balance", methods=["POST"])
+def exchange_balance():
+    body = request.get_json(silent=True) or {}
+
+    exchange_id = body.get("exchange", "").lower().strip()
+    api_key     = body.get("api_key",  body.get("apiKey", "")).strip()
+    secret      = body.get("secret",   "").strip()
+    password    = body.get("password", "").strip()
+    mode        = body.get("mode",     "paper")
+
+    if not exchange_id:
+        return jsonify({"error": "exchange field required"}), 400
+    if not api_key or not secret:
+        return jsonify({"error": "api_key and secret required"}), 400
+
+    SUPPORTED = ["kucoin", "binance", "bybit", "okx",
+                 "kraken", "bitget", "gateio"]
+    if exchange_id not in SUPPORTED:
+        return jsonify({"error": f"'{exchange_id}' not supported"}), 400
+
+    try:
+        # Build ccxt instance
+        ex_class = getattr(ccxt, exchange_id)
+        config   = {
+            "apiKey":          api_key,
+            "secret":          secret,
+            "enableRateLimit": True,
+            "options":         {"defaultType": "spot"},
+        }
+        if password:
+            config["password"] = password
+
+        ex = ex_class(config)
+
+        # Enable sandbox for paper mode
+        if mode == "paper":
+            try:
+                ex.set_sandbox_mode(True)
+            except Exception:
+                pass
+
+        # Fetch balance
+        balance      = ex.fetch_balance()
+        total_usdt   = 0.0
+        free_usdt    = 0.0
+        active_pairs = []
+
+        for asset, amt in (balance.get("total") or {}).items():
+            if not amt or float(amt) <= 0:
+                continue
+            val = float(amt)
+            if asset in ("USDT", "USDC", "BUSD", "TUSD"):
+                total_usdt += val
+                free_usdt  += float((balance.get("free") or {}).get(asset, 0) or 0)
+            else:
+                try:
+                    ticker = ex.fetch_ticker(f"{asset}/USDT")
+                    price  = float(ticker.get("last") or 0)
+                    worth  = val * price
+                    total_usdt += worth
+                    if worth > 1:
+                        active_pairs.append(f"{asset}/USDT")
+                except Exception:
+                    pass
+
+        # PnL from open positions (futures/margin)
+        pnl = 0.0
+        try:
+            for pos in (ex.fetch_positions() or []):
+                pnl += float(pos.get("unrealizedPnl") or 0)
+                if float(pos.get("contracts") or 0) > 0:
+                    sym = pos.get("symbol", "")
+                    if sym and sym not in active_pairs:
+                        active_pairs.append(sym)
+        except Exception:
+            pass
+
+        log.info(f"🔎 [Proxy]: {exchange_id} balance — ${total_usdt:.0f} USDT ({mode})")
+
+        return jsonify({
+            "status":       "live",
+            "exchange":     exchange_id,
+            "mode":         mode,
+            "total_usdt":   round(total_usdt, 2),
+            "free_usdt":    round(free_usdt,  2),
+            "used_usdt":    round(total_usdt - free_usdt, 2),
+            "active_pairs": active_pairs[:5],
+            "pnl":          round(pnl, 2),
+        })
+
+    except ccxt.AuthenticationError:
+        log.warning(f"[Proxy] Auth error — {exchange_id}")
+        return jsonify({
+            "status":   "auth_error",
+            "error":    "Authentication failed — check API key and secret",
+            "exchange": exchange_id,
+        }), 401
+
+    except ccxt.NetworkError as e:
+        return jsonify({"status": "network_error", "error": str(e)}), 503
+
+    except ccxt.ExchangeError as e:
+        return jsonify({"status": "exchange_error", "error": str(e)}), 502
+
+    except Exception as e:
+        log.error(f"[Proxy] exchange_balance error: {e}", exc_info=True)
+        return jsonify({"status": "error", "error": str(e)[:200]}), 500
+
 
 if __name__ == "__main__":
     log.info(f"[SnipBot Proxy]: Starting on port {PORT}")
