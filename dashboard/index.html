@@ -522,9 +522,7 @@ function loadMockTrades(){
 
 /* ── AGENTS ── */
 /* ── AGENTS — LIVE FROM SNIPBOT AGENTS SERVICE ── */
-const AGENTS_URL = typeof SNIPBOT_AGENTS !== 'undefined'
-  ? SNIPBOT_AGENTS
-  : 'https://snipbot-agents.up.railway.app';
+const AGENTS_URL = 'https://snipbot-proxy.up.railway.app';
 
 function agentCard(name, role, conf, clr, verdict){
   return `
