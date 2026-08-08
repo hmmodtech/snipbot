@@ -1,63 +1,112 @@
 """
-Multi-Pair Scanner — ماسح متعدد الأزواج
-يجلب البيانات لكل الأزواج من KuCoin
+SnipBot — Multi-Pair Scanner
+-----------------------------
+Fetches OHLCV candles from KuCoin via ccxt (paper trading safe).
+Passes data to StrategyManager for each pair.
+Returns list of actionable Signals.
 """
 
-import ccxt
-import pandas as pd
 import logging
-import time
+import asyncio
+from typing import List, Optional
+import pandas as pd
+import ccxt.async_support as ccxt
 
-log = logging.getLogger("Scanner")
+from .strategy_manager import StrategyManager
+from .strategies.base_strategy import Signal
+
+log = logging.getLogger("SnipBot.Scanner")
+
+
+PAIRS = [
+    "BTC/USDT",
+    "ETH/USDT",
+    "BNB/USDT",
+    "SOL/USDT",
+]
+
+TIMEFRAME   = "1h"
+CANDLE_LIMIT = 200   # enough for all indicators
 
 
 class Scanner:
-    """
-    يجلب بيانات OHLCV لأي عدد من الأزواج
-    من KuCoin مباشرة — بدون API keys
-    """
 
-    def __init__(self):
+    def __init__(self, config: dict):
+        self.config  = config
+        self.manager = StrategyManager(config)
+        self.pairs   = config.get("pairs", PAIRS)
+        self.timeframe = config.get("timeframe", TIMEFRAME)
+
         self.exchange = ccxt.kucoin({
-            "enableRateLimit": True,  # مهم — يمنع الحظر
+            "apiKey":    config.get("KUCOIN_API_KEY", ""),
+            "secret":    config.get("KUCOIN_SECRET",  ""),
+            "password":  config.get("KUCOIN_PASS",    ""),
+            "enableRateLimit": True,
+            # Paper trading: use sandbox if available
+            "options": {"defaultType": "spot"},
         })
-        log.info("[Scanner]: KuCoin connection ready")
 
-    def fetch(self, symbol: str, timeframe: str = "1h", limit: int = 100):
-        """
-        جلب بيانات زوج واحد
-        
-        المدخلات:
-            symbol: مثل BTC/USDT
-            timeframe: 1m, 5m, 15m, 1h, 4h, 1d
-            limit: عدد الشمعات
-        """
+    async def fetch_ohlcv(self, pair: str) -> Optional[pd.DataFrame]:
+        """Fetch OHLCV candles for one pair."""
         try:
-            ohlcv = self.exchange.fetch_ohlcv(
-                symbol, timeframe, limit=limit
+            raw = await self.exchange.fetch_ohlcv(
+                pair, self.timeframe, limit=CANDLE_LIMIT
             )
-            df = pd.DataFrame(
-                ohlcv,
-                columns=["timestamp", "open", "high", "low", "close", "volume"]
-            )
+            if not raw or len(raw) < 50:
+                log.warning(f"[Scanner] Too few candles for {pair}: {len(raw) if raw else 0}")
+                return None
+
+            df = pd.DataFrame(raw, columns=["timestamp", "open", "high", "low", "close", "volume"])
             df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-            df = df.set_index("timestamp")
-            log.info(f"[Scanner]: {symbol} — {len(df)} candles fetched")
+            df.set_index("timestamp", inplace=True)
+            df = df.astype(float)
             return df
+
+        except ccxt.NetworkError as e:
+            log.error(f"[Scanner] Network error on {pair}: {e}")
+            return None
+        except ccxt.ExchangeError as e:
+            log.error(f"[Scanner] Exchange error on {pair}: {e}")
+            return None
         except Exception as e:
-            log.error(f"[Scanner]: Failed to fetch {symbol} — {e}")
+            log.error(f"[Scanner] Unexpected error on {pair}: {e}")
             return None
 
-    def fetch_all(self, symbols: list, timeframe: str = "1h", limit: int = 100):
-        """
-        جلب بيانات كل الأزواج
-        مع تأخير بسيط بين كل طلب
-        """
-        results = {}
-        for symbol in symbols:
-            df = self.fetch(symbol, timeframe, limit)
-            if df is not None:
-                results[symbol] = df
-            time.sleep(1)  # تأخير 1 ثانية — يمنع الحظر من KuCoin
-        log.info(f"[Scanner]: Fetched {len(results)}/{len(symbols)} pairs")
-        return results
+    async def scan_pair(self, pair: str) -> Optional[Signal]:
+        """Fetch candles + run strategy vote for one pair."""
+        df = await self.fetch_ohlcv(pair)
+        if df is None:
+            return None
+
+        signal = self.manager.vote(pair, df)
+        if signal and signal.is_actionable():
+            log.info(
+                f"🎯 [SnipBot]: Target acquired on {pair}. "
+                f"Price at ${df['close'].iloc[-1]:.2f}. "
+                f"Action: {signal.action} @ {signal.confidence:.1f}% confidence. "
+                f"Trigger armed."
+            )
+        else:
+            log.info(f"◎ [SnipBot Tracking]: {pair} under surveillance — awaiting breakout confirmation.")
+
+        return signal
+
+    async def scan_all(self) -> List[Signal]:
+        """Scan all pairs concurrently. Returns actionable signals only."""
+        tasks = [self.scan_pair(pair) for pair in self.pairs]
+        results = await asyncio.gather(*tasks, return_exceptions=False)
+
+        actionable = [
+            sig for sig in results
+            if sig is not None and sig.is_actionable()
+        ]
+
+        log.info(
+            f"🔎 [Sniper Engine]: Scan complete — "
+            f"{len(self.pairs)} pairs scanned · "
+            f"{len(actionable)} actionable signals found."
+        )
+        return actionable
+
+    async def close(self):
+        await self.exchange.close()
