@@ -12,7 +12,7 @@ from typing import Optional
 from telegram import Bot
 from telegram.error import TelegramError
 
-from .strategies.base_strategy import Signal
+from strategies.base_strategy import Signal
 
 log = logging.getLogger("SnipBot.Notifier")
 
