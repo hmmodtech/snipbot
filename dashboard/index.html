@@ -891,8 +891,16 @@ async function refreshAll(){
   document.getElementById('refresh-indicator').style.display='none';
 }
 
-buildChart();renderPairs();refreshAll();
-setInterval(refreshAll,REFRESH_MS);
+buildChart();
+renderPairs();
+
+// إخفاء LOADING بعد 5 ثواني في أي حال
+setTimeout(() => {
+  const ind = document.getElementById('refresh-indicator');
+  if (ind) ind.style.display = 'none';
+}, 5000);
+
+setTimeout(() => refreshAll(), 1000);setInterval(refreshAll,REFRESH_MS);
 setInterval(loadAgents,30000);
 setInterval(addSnippet,25000);
 </script>
