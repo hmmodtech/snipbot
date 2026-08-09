@@ -261,8 +261,16 @@ const REFRESH_MS=15000;
   <div style="display:flex;align-items:center;gap:8px;">
     <span class="chip chip-muted" id="topbar-clock">--:--:--</span>
     <span class="chip chip-muted" id="uptime-chip">UP: 00:00</span>
+    <!-- API Status Dot -->
+    <div style="display:flex;align-items:center;gap:5px;">
+        <div id="api-status-dot" style="width:6px;height:6px;border-radius:50%;
+             background:var(--amber);box-shadow:0 0 4px var(--amber);
+             flex-shrink:0;transition:.3s"></div>
+        <span id="api-status-label" style="font-family:var(--mono);
+              font-size:9px;color:var(--amber)">API...</span>
+    </div>
     <button class="abort-btn" onclick="emergencyAbort()">⬡ ABORT</button>
-  </div>
+</div>
 </div>
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 <div class="layout">
@@ -568,8 +576,8 @@ const REFRESH_MS=15000;
 
 <div class="toast" id="toast"></div>
 <script>
-let API=typeof PROXY_URL!=='undefined'?PROXY_URL:'https://snipbot-proxy.up.railway.app';
-let AGENT_API=typeof AGENTS_URL!=='undefined'?AGENTS_URL:'https://snipbot-agents.up.railway.app';
+const API       = 'https://snipbot-proxy.up.railway.app';
+const AGENT_API = 'https://snipbot-proxy.up.railway.app';
 let upSec=0,currentExchangeId='kucoin';
 let activePairs=JSON.parse(localStorage.getItem('snipbot_pairs')||'["BTC/USDT","ETH/USDT","BNB/USDT","SOL/USDT"]');
 let exchanges=JSON.parse(localStorage.getItem('snipbot_exchanges')||'[]');
@@ -613,10 +621,31 @@ function setPage(p,el){
 async function apiFetch(path){
   try{const r=await fetch(API+path);if(!r.ok)throw new Error(r.status);return await r.json();}catch{return null;}
 }
-function setApiStatus(ok){
-  const chip=document.getElementById('engine-chip'),sd=document.getElementById('sd-api'),sv=document.getElementById('sv-api');
-  if(ok){chip.textContent='● ENGINE ONLINE';chip.className='chip chip-neon';sd.style.background='var(--neon)';sv.textContent='online';sv.style.color='var(--neon)';}
-  else{chip.textContent='● ENGINE OFFLINE';chip.className='chip chip-danger';sd.style.background='var(--danger)';sv.textContent='offline';sv.style.color='var(--danger)';}
+function setApiStatus(ok) {
+  const chip = document.getElementById('engine-chip');
+  const sd   = document.getElementById('sd-api');
+  const sv   = document.getElementById('sv-api');
+
+  if (ok) {
+    chip.textContent = '● ENGINE ONLINE';
+    chip.className   = 'chip chip-neon';
+    if (sd) { sd.style.background = 'var(--neon)'; sd.style.boxShadow = '0 0 4px var(--neon)'; }
+    if (sv) { sv.textContent = 'online'; sv.style.color = 'var(--neon)'; }
+    // ── API dot في status bar أعلى اليمين ──
+    const apiDot = document.getElementById('api-status-dot');
+    const apiLbl = document.getElementById('api-status-label');
+    if (apiDot) { apiDot.style.background = 'var(--neon)'; apiDot.style.boxShadow = '0 0 6px var(--neon)'; }
+    if (apiLbl) { apiLbl.textContent = 'API LIVE'; apiLbl.style.color = 'var(--neon)'; }
+  } else {
+    chip.textContent = '● ENGINE OFFLINE';
+    chip.className   = 'chip chip-danger';
+    if (sd) { sd.style.background = 'var(--danger)'; }
+    if (sv) { sv.textContent = 'offline'; sv.style.color = 'var(--danger)'; }
+    const apiDot = document.getElementById('api-status-dot');
+    const apiLbl = document.getElementById('api-status-label');
+    if (apiDot) { apiDot.style.background = 'var(--danger)'; apiDot.style.boxShadow = '0 0 6px var(--danger)'; }
+    if (apiLbl) { apiLbl.textContent = 'API OFFLINE'; apiLbl.style.color = 'var(--danger)'; }
+  }
 }
 
 async function loadPortfolio(){
