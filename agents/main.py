@@ -1,22 +1,17 @@
 """
-SnipBot — Hybrid Agent Runner + Status API
--------------------------------------------
-Scan loop + Flask HTTP server running concurrently.
-GET /status  → آخر نتائج scan لكل pair
-GET /health  → health check
+SnipBot — Hybrid Agent Runner
+------------------------------
+Scan loop + sends results to Proxy /api/agents/update
+so the Dashboard Agent Radar shows live data.
 """
 
 import asyncio
 import logging
 import os
 import sys
-import time
-import threading
+import requests
 from datetime import datetime, timezone
-from typing import Optional, List
 from dotenv import load_dotenv
-from flask import Flask, jsonify
-from flask_cors import CORS
 
 load_dotenv()
 
@@ -39,7 +34,7 @@ INTERVAL = int(os.environ.get("SCAN_INTERVAL", "300"))
 MIN_CONF = float(os.environ.get("MIN_CONFIDENCE", "65"))
 PAIRS    = [p.strip() for p in os.environ.get("PAIRS", "BTC/USDT,ETH/USDT,BNB/USDT,SOL/USDT").split(",")]
 TF       = os.environ.get("TIMEFRAME", "1h")
-PORT     = int(os.environ.get("PORT", "8080"))
+PROXY_URL= os.environ.get("PROXY_URL", "https://snipbot-proxy.up.railway.app")
 
 CONFIG = {
     "KUCOIN_API_KEY": os.environ.get("KUCOIN_API_KEY", ""),
@@ -49,52 +44,26 @@ CONFIG = {
     "timeframe": TF,
 }
 
-# ── Shared state (scan results) ───────────────────────────────────────────────
-# Written by scan loop, read by Flask API
-scan_state = {
-    "last_scan":    None,      # ISO timestamp
-    "scan_count":   0,
-    "pairs":        {},        # { "BTC/USDT": { action, confidence, reason, strategy } }
-    "active_signals": [],      # actionable signals only
-    "system": {
-        "strategies": ["TA", "DCA"],
-        "min_confidence": MIN_CONF,
-        "interval_sec":   INTERVAL,
-        "timeframe":      TF,
-        "pairs":          PAIRS,
-    }
-}
 
-# ── Flask Status API ──────────────────────────────────────────────────────────
-app = Flask(__name__)
-CORS(app)
-
-@app.route("/health")
-def health():
-    return jsonify({
-        "status": "online",
-        "scan_count": scan_state["scan_count"],
-        "last_scan":  scan_state["last_scan"],
-    })
-
-@app.route("/status")
-def status():
-    return jsonify(scan_state)
-
-@app.route("/api/agents/status")
-def agents_status():
-    """Same as /status — matches proxy endpoint naming."""
-    return jsonify(scan_state)
+def push_to_proxy(agents_data: dict):
+    """
+    Send scan results to Proxy /api/agents/update
+    so Dashboard Agent Radar shows live data.
+    """
+    try:
+        r = requests.post(
+            f"{PROXY_URL}/api/agents/update",
+            json=agents_data,
+            timeout=5,
+        )
+        if r.status_code == 200:
+            log.info("🔎 [Proxy]: Agent Radar updated successfully")
+        else:
+            log.warning(f"[Proxy]: agents/update returned {r.status_code}")
+    except Exception as e:
+        log.warning(f"[Proxy]: Could not push agent update — {e}")
 
 
-def run_flask():
-    """Run Flask in a background thread."""
-    import logging as _log
-    _log.getLogger("werkzeug").setLevel(_log.ERROR)
-    app.run(host="0.0.0.0", port=PORT, debug=False, use_reloader=False)
-
-
-# ── Scan Loop ─────────────────────────────────────────────────────────────────
 async def run():
     if not TOKEN or not CHAT_ID:
         log.error("⛔ [SnipBot ABORT]: TELEGRAM_TOKEN or TELEGRAM_CHAT_ID missing.")
@@ -105,10 +74,11 @@ async def run():
     log.info(f"Strategies: ['TA', 'DCA']")
     log.info(f"Interval:   {INTERVAL // 60} min")
     log.info(f"Min conf:   {MIN_CONF:.0f}%")
-    log.info(f"Status API: port {PORT}")
+    log.info(f"Proxy:      {PROXY_URL}")
 
     notifier = Notifier(TOKEN, CHAT_ID)
     scanner  = Scanner(CONFIG)
+    manager  = StrategyManager(config=CONFIG)
 
     await notifier.send(
         f"🎯 <b>[SnipBot]</b>: Hybrid Agent System online.\n"
@@ -121,51 +91,61 @@ async def run():
     try:
         while True:
             scan_count += 1
-            scan_state["scan_count"] = scan_count
             log.info(f"🔎 [Sniper Engine]: Scan #{scan_count} starting...")
 
-            try:
-                # Run strategies on all pairs
-                pair_results = {}
-                active_signals = []
+            agent_results = []
+            active_signals = []
 
+            try:
                 for pair in PAIRS:
                     df = await scanner.fetch_ohlcv(pair)
                     if df is None:
-                        pair_results[pair] = {
-                            "action": "NO DATA", "confidence": 0,
-                            "reason": "Could not fetch OHLCV", "strategy": "—"
-                        }
+                        log.info(f"◎ [Scanner]: No data for {pair}")
+                        agent_results.append({
+                            "name":       "TA Analyst",
+                            "action":     "NO DATA",
+                            "confidence": 0,
+                            "reason":     f"Could not fetch OHLCV for {pair}",
+                            "pair":       pair,
+                        })
                         continue
 
-                    signal = scanner.manager.vote(pair, df)
+                    # Run TA strategy vote
+                    signal = manager.vote(pair, df)
 
                     if signal:
-                        pair_results[pair] = {
-                            "action":      signal.action,
-                            "confidence":  round(signal.confidence, 1),
-                            "reason":      signal.reason,
-                            "strategy":    signal.strategy,
-                            "entry_price": signal.entry_price,
-                            "stop_loss":   signal.stop_loss,
-                            "take_profit": signal.take_profit,
-                        }
+                        agent_results.append({
+                            "name":       signal.strategy,
+                            "action":     signal.action,
+                            "confidence": round(signal.confidence, 1),
+                            "reason":     signal.reason[:100],
+                            "pair":       pair,
+                        })
                         if signal.is_actionable(MIN_CONF):
                             active_signals.append(signal)
+                            log.info(f"🎯 {pair} → {signal.action} {signal.confidence:.1f}%")
                     else:
-                        pair_results[pair] = {
-                            "action": "HOLD", "confidence": 50,
-                            "reason": "No consensus", "strategy": "—"
-                        }
+                        agent_results.append({
+                            "name":       "Consensus",
+                            "action":     "HOLD",
+                            "confidence": 50,
+                            "reason":     f"{pair}: No consensus between strategies",
+                            "pair":       pair,
+                        })
+                        log.info(f"◎ [SnipBot Tracking]: {pair} — awaiting breakout.")
 
-                # Update shared state
-                scan_state["last_scan"]      = datetime.now(timezone.utc).isoformat()
-                scan_state["pairs"]          = pair_results
-                scan_state["active_signals"] = [
-                    {"pair": s.pair, "action": s.action,
-                     "confidence": round(s.confidence, 1), "strategy": s.strategy}
-                    for s in active_signals
-                ]
+                # Push results to Proxy → Dashboard
+                push_to_proxy({
+                    "timestamp":  datetime.now(timezone.utc).isoformat(),
+                    "scan_count": scan_count,
+                    "strategies": agent_results,
+                    "signals":    [
+                        {"pair": s.pair, "action": s.action,
+                         "confidence": round(s.confidence, 1)}
+                        for s in active_signals
+                    ],
+                    "symbols": PAIRS,
+                })
 
                 # Send Telegram alerts
                 for sig in active_signals:
@@ -175,7 +155,7 @@ async def run():
                         await notifier.sell_signal(sig)
 
                 if not active_signals:
-                    log.info(f"◎ [SnipBot Tracking]: No triggers on scan #{scan_count}.")
+                    log.info(f"◎ No triggers on scan #{scan_count}.")
 
                 if scan_count % 6 == 0:
                     await notifier.scan_summary(
@@ -199,10 +179,4 @@ async def run():
 
 
 if __name__ == "__main__":
-    # Start Flask in background thread
-    t = threading.Thread(target=run_flask, daemon=True)
-    t.start()
-    log.info(f"🔎 [Sniper Engine]: Status API started on port {PORT}")
-
-    # Run async scan loop in main thread
     asyncio.run(run())
