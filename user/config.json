@@ -1,28 +1,40 @@
 {
   "crypto_currencies": {
-    "Bitcoin": {
-      "pairs": {"BTC/USDT": {}}
+    "ADA": {
+      "pairs": ["ADA/USDT"]
     },
-    "Ethereum": {
-      "pairs": {"ETH/USDT": {}}
+    "XRP": {
+      "pairs": ["XRP/USDT"]
+    },
+    "BTC": {
+      "pairs": ["BTC/USDT"]
+    },
+    "ETH": {
+      "pairs": ["ETH/USDT"]
     }
   },
   "exchanges": {
-    "binanceus": {
-      "api-key": "",
-      "api-secret": ""
+    "kucoin": {
+      "enabled": true,
+      "sandboxed": true
     }
   },
   "trader": {
     "enabled": false
   },
-  "trader_simulator": {
+  "trader-simulator": {
     "enabled": true,
-    "fees": 0.1,
-    "starting_portfolio": {
-      "USDT": 10000,
-      "BTC": 0,
-      "ETH": 0
+    "fees": {
+      "maker": 0.1,
+      "taker": 0.1
+    },
+    "starting-portfolio": {
+      "USDT": 10000
     }
-  }
+  },
+  "trading": {
+    "reference-market": "USDT",
+    "current-bot-id": ""
+  },
+  "tentacles-packages": []
 }
