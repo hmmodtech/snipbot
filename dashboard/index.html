@@ -108,7 +108,7 @@ nav{padding:10px 8px;flex:1;overflow-y:auto;}
 .toggle input:checked + .toggle-slider::before{transform:translateX(20px);background:#040a02;}
 .toggle-label{font-family:var(--mono);font-size:10px;color:var(--muted);min-width:28px;}
 .g2{display:grid;grid-template-columns:1.5fr 1fr;gap:10px;}
-.chart-wrap{height:150px;position:relative;}
+.chart-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
 .ex-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
 .ex-card{background:var(--surface);border:1px solid var(--border);border-radius:7px;
   padding:10px;position:relative;overflow:hidden;}
@@ -216,6 +216,37 @@ nav{padding:10px 8px;flex:1;overflow-y:auto;}
 .menu-btn{display:none;background:transparent;border:1px solid var(--border);
   border-radius:5px;padding:5px 8px;cursor:pointer;color:var(--steel);font-size:16px;}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;}
+
+/* ── CANDLESTICK CHART ── */
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;flex-wrap:wrap;}
+.chart-pair-nav{display:flex;align-items:center;gap:8px;}
+.nav-arrow{width:26px;height:26px;border-radius:4px;border:1px solid var(--border);
+  background:transparent;color:var(--steel);cursor:pointer;font-size:16px;
+  display:flex;align-items:center;justify-content:center;transition:.15s;line-height:1;
+  font-family:sans-serif;}
+.nav-arrow:hover{border-color:var(--neon);color:var(--neon);}
+.chart-pair-name{font-family:var(--raj);font-size:14px;font-weight:700;
+  color:#fff;letter-spacing:.05em;min-width:100px;text-align:center;}
+.chart-pair-price{font-family:var(--mono);font-size:11px;color:var(--neon);}
+.chart-pair-change{font-family:var(--mono);font-size:9px;padding:1px 5px;
+  border-radius:3px;border:1px solid;}
+.chart-pair-change.up{color:var(--neon);border-color:rgba(57,255,20,.3);background:var(--neon-dim);}
+.chart-pair-change.dn{color:var(--danger);border-color:rgba(255,60,60,.3);background:var(--danger-dim);}
+.tf-btns{display:flex;gap:3px;}
+.tf-btn{padding:2px 7px;border-radius:3px;font-family:var(--mono);font-size:9px;
+  cursor:pointer;border:1px solid var(--border);background:transparent;
+  color:var(--muted);transition:.15s;}
+.tf-btn.active{border-color:var(--neon);color:var(--neon);background:var(--neon-dim);}
+.chart-canvas-wrap{position:relative;height:200px;background:var(--surface);
+  border-radius:6px;overflow:hidden;}
+.chart-crosshair{position:absolute;top:0;pointer-events:none;width:1px;
+  background:rgba(57,255,20,.3);height:100%;display:none;}
+.chart-tooltip{position:absolute;background:var(--card);border:1px solid var(--border);
+  border-radius:6px;padding:8px 10px;font-family:var(--mono);font-size:9px;
+  pointer-events:none;display:none;z-index:10;min-width:130px;}
+.chart-tooltip-row{display:flex;justify-content:space-between;gap:12px;margin-bottom:2px;}
+.chart-tooltip-label{color:var(--muted);}
+.chart-vol-wrap{height:36px;margin-top:3px;}
 ::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
 @media(max-width:900px){
@@ -261,16 +292,8 @@ const REFRESH_MS=15000;
   <div style="display:flex;align-items:center;gap:8px;">
     <span class="chip chip-muted" id="topbar-clock">--:--:--</span>
     <span class="chip chip-muted" id="uptime-chip">UP: 00:00</span>
-    <!-- API Status Dot -->
-    <div style="display:flex;align-items:center;gap:5px;">
-        <div id="api-status-dot" style="width:6px;height:6px;border-radius:50%;
-             background:var(--amber);box-shadow:0 0 4px var(--amber);
-             flex-shrink:0;transition:.3s"></div>
-        <span id="api-status-label" style="font-family:var(--mono);
-              font-size:9px;color:var(--amber)">API...</span>
-    </div>
     <button class="abort-btn" onclick="emergencyAbort()">⬡ ABORT</button>
-</div>
+  </div>
 </div>
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 <div class="layout">
@@ -348,7 +371,43 @@ const REFRESH_MS=15000;
             <button class="btn btn-ghost" style="padding:2px 7px;font-size:9px" onclick="setRange('1M')">1M</button>
           </div>
         </div>
-        <div class="chart-wrap"><canvas id="pc"></canvas></div>
+        <!-- Candlestick Chart -->
+      <div class="chart-header">
+        <div class="chart-pair-nav">
+          <button class="nav-arrow" onclick="chartPrevPair()">&#8592;</button>
+          <div>
+            <div class="chart-pair-name" id="chart-pair-name">ADA/USDT</div>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:2px;">
+              <span class="chart-pair-price" id="chart-pair-price">—</span>
+              <span class="chart-pair-change up" id="chart-pair-change">—</span>
+            </div>
+          </div>
+          <button class="nav-arrow" onclick="chartNextPair()">&#8594;</button>
+        </div>
+        <div class="tf-btns">
+          <button class="tf-btn active" onclick="setChartTF('15m',this)">15m</button>
+          <button class="tf-btn" onclick="setChartTF('1h',this)">1H</button>
+          <button class="tf-btn" onclick="setChartTF('4h',this)">4H</button>
+          <button class="tf-btn" onclick="setChartTF('1d',this)">1D</button>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap" id="chart-canvas-wrap">
+        <canvas id="candlestick-canvas"></canvas>
+        <div class="chart-crosshair" id="chart-crosshair"></div>
+        <div class="chart-tooltip" id="chart-tooltip">
+          <div class="chart-tooltip-row"><span class="chart-tooltip-label">O</span><span id="tt-open">—</span></div>
+          <div class="chart-tooltip-row"><span class="chart-tooltip-label">H</span><span id="tt-high" style="color:var(--neon)">—</span></div>
+          <div class="chart-tooltip-row"><span class="chart-tooltip-label">L</span><span id="tt-low" style="color:var(--danger)">—</span></div>
+          <div class="chart-tooltip-row"><span class="chart-tooltip-label">C</span><span id="tt-close">—</span></div>
+          <div style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px;" class="chart-tooltip-row">
+            <span class="chart-tooltip-label">Vol</span><span id="tt-vol" style="color:var(--amber)">—</span>
+          </div>
+        </div>
+        <div class="chart-loading" id="chart-loading">
+          <div class="loading"><div class="spin"></div>Loading...</div>
+        </div>
+      </div>
+      <div class="chart-vol-wrap"><canvas id="volume-canvas"></canvas></div>
       </div>
       <div class="card">
         <div class="ch"><span class="ct">Risk Metrics</span>
@@ -576,8 +635,8 @@ const REFRESH_MS=15000;
 
 <div class="toast" id="toast"></div>
 <script>
-const API       = 'https://snipbot-proxy.up.railway.app';
-const AGENT_API = 'https://snipbot-proxy.up.railway.app';
+let API=typeof PROXY_URL!=='undefined'?PROXY_URL:'https://snipbot-proxy.up.railway.app';
+let AGENT_API=typeof AGENTS_URL!=='undefined'?AGENTS_URL:'https://snipbot-agents.up.railway.app';
 let upSec=0,currentExchangeId='kucoin';
 let activePairs=JSON.parse(localStorage.getItem('snipbot_pairs')||'["BTC/USDT","ETH/USDT","BNB/USDT","SOL/USDT"]');
 let exchanges=JSON.parse(localStorage.getItem('snipbot_exchanges')||'[]');
@@ -621,31 +680,10 @@ function setPage(p,el){
 async function apiFetch(path){
   try{const r=await fetch(API+path);if(!r.ok)throw new Error(r.status);return await r.json();}catch{return null;}
 }
-function setApiStatus(ok) {
-  const chip = document.getElementById('engine-chip');
-  const sd   = document.getElementById('sd-api');
-  const sv   = document.getElementById('sv-api');
-
-  if (ok) {
-    chip.textContent = '● ENGINE ONLINE';
-    chip.className   = 'chip chip-neon';
-    if (sd) { sd.style.background = 'var(--neon)'; sd.style.boxShadow = '0 0 4px var(--neon)'; }
-    if (sv) { sv.textContent = 'online'; sv.style.color = 'var(--neon)'; }
-    // ── API dot في status bar أعلى اليمين ──
-    const apiDot = document.getElementById('api-status-dot');
-    const apiLbl = document.getElementById('api-status-label');
-    if (apiDot) { apiDot.style.background = 'var(--neon)'; apiDot.style.boxShadow = '0 0 6px var(--neon)'; }
-    if (apiLbl) { apiLbl.textContent = 'API LIVE'; apiLbl.style.color = 'var(--neon)'; }
-  } else {
-    chip.textContent = '● ENGINE OFFLINE';
-    chip.className   = 'chip chip-danger';
-    if (sd) { sd.style.background = 'var(--danger)'; }
-    if (sv) { sv.textContent = 'offline'; sv.style.color = 'var(--danger)'; }
-    const apiDot = document.getElementById('api-status-dot');
-    const apiLbl = document.getElementById('api-status-label');
-    if (apiDot) { apiDot.style.background = 'var(--danger)'; apiDot.style.boxShadow = '0 0 6px var(--danger)'; }
-    if (apiLbl) { apiLbl.textContent = 'API OFFLINE'; apiLbl.style.color = 'var(--danger)'; }
-  }
+function setApiStatus(ok){
+  const chip=document.getElementById('engine-chip'),sd=document.getElementById('sd-api'),sv=document.getElementById('sv-api');
+  if(ok){chip.textContent='● ENGINE ONLINE';chip.className='chip chip-neon';sd.style.background='var(--neon)';sv.textContent='online';sv.style.color='var(--neon)';}
+  else{chip.textContent='● ENGINE OFFLINE';chip.className='chip chip-danger';sd.style.background='var(--danger)';sv.textContent='offline';sv.style.color='var(--danger)';}
 }
 
 async function loadPortfolio(){
@@ -726,15 +764,145 @@ async function loadRisk(){
   document.getElementById('risk-meters').innerHTML=RISKS.map(r=>'<div class="rr"><div class="rl">'+r.l+'</div><div class="rb"><div class="rf" style="width:'+r.pct+'%;background:'+r.clr+'"></div></div><div class="rv" style="color:'+r.clr+'">'+r.v+'</div></div>').join('');
 }
 
-let chart;
-const chartData={'1D':{l:['00','04','08','12','16','20','24'],d:[10000,10000,10000,10000,10000,10000,10000]},'1W':{l:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],d:[10000,10000,10000,10000,10000,10000,10000]},'1M':{l:['W1','W2','W3','W4'],d:[10000,10000,10000,10000]}};
-function buildChart(range='1D'){
-  const ctx=document.getElementById('pc').getContext('2d'),{l,d}=chartData[range];
-  if(chart)chart.destroy();
-  const g=ctx.createLinearGradient(0,0,0,150);g.addColorStop(0,'rgba(57,255,20,.2)');g.addColorStop(1,'rgba(57,255,20,0)');
-  chart=new Chart(ctx,{type:'line',data:{labels:l,datasets:[{data:d,borderColor:'#39ff14',borderWidth:2,backgroundColor:g,fill:true,tension:.4,pointRadius:0,pointHoverRadius:4,pointHoverBackgroundColor:'#39ff14'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#131b2a',borderColor:'#1e2d45',borderWidth:1,titleColor:'#4a6080',bodyColor:'#c8d4e8',callbacks:{label:c=>' $'+c.parsed.y.toLocaleString()}}},scales:{x:{grid:{color:'rgba(30,45,69,.5)'},ticks:{color:'#4a6080',font:{family:'IBM Plex Mono',size:9}}},y:{grid:{color:'rgba(30,45,69,.5)'},ticks:{color:'#4a6080',font:{family:'IBM Plex Mono',size:9},callback:v=>'$'+v.toLocaleString()}}}}});
+/* ════════════════════════════════════════
+   CANDLESTICK CHART ENGINE
+════════════════════════════════════════ */
+let chartPairIndex=0,chartTF='15m',chartCandles=[];
+function getChartPairs(){return activePairs.length>0?[...activePairs]:['ADA/USDT','XRP/USDT'];}
+function buildChart(){initCandlestickChart();}
+function setRange(){}
+
+async function initCandlestickChart(){
+  chartPairIndex=0;loadCandlestickChart();
+  const wrap=document.getElementById('chart-canvas-wrap');
+  if(wrap){wrap.addEventListener('mousemove',onChartMouseMove);wrap.addEventListener('mouseleave',onChartMouseLeave);}
+  setInterval(()=>{if(document.getElementById('page-board').style.display!=='none')loadCandlestickChart();},30000);
+  window.addEventListener('resize',()=>{if(chartCandles.length>0)drawCandlestick();});
 }
-function setRange(r){buildChart(r);}
+
+async function loadCandlestickChart(){
+  const pairs=getChartPairs();
+  const pair=pairs[chartPairIndex]||'ADA/USDT';
+  const nameEl=document.getElementById('chart-pair-name');
+  if(nameEl)nameEl.textContent=pair;
+  const loadEl=document.getElementById('chart-loading');
+  if(loadEl){loadEl.innerHTML='<div class="loading"><div class="spin"></div>Loading...</div>';loadEl.style.display='flex';}
+  try{
+    const res=await fetch(API+'/api/ohlcv?symbol='+encodeURIComponent(pair)+'&timeframe='+chartTF+'&limit=80',{signal:AbortSignal.timeout(10000)});
+    const data=await res.json();
+    if(data.status==='live'&&data.candles?.length>0){chartCandles=data.candles;drawCandlestick();updateChartHeader(data.candles);}
+    else showChartError('No data from KuCoin');
+  }catch(e){showChartError('Proxy offline');}
+  if(loadEl)loadEl.style.display='none';
+}
+
+function updateChartHeader(candles){
+  if(!candles||candles.length<2)return;
+  const last=candles[candles.length-1],prev=candles[candles.length-2];
+  const chg=(last.c-prev.c)/prev.c*100;
+  const prEl=document.getElementById('chart-pair-price');
+  const chEl=document.getElementById('chart-pair-change');
+  if(prEl)prEl.textContent='$'+(last.c<1?last.c.toFixed(4):last.c.toFixed(2));
+  if(chEl){chEl.textContent=(chg>=0?'+':'')+chg.toFixed(2)+'%';chEl.className='chart-pair-change '+(chg>=0?'up':'dn');}
+}
+
+function drawCandlestick(){
+  const canvas=document.getElementById('candlestick-canvas');
+  const volCvs=document.getElementById('volume-canvas');
+  const wrap=document.getElementById('chart-canvas-wrap');
+  if(!canvas||!wrap)return;
+  canvas.width=wrap.clientWidth;canvas.height=wrap.clientHeight;
+  if(volCvs){volCvs.width=wrap.clientWidth;volCvs.height=36;}
+  const ctx=canvas.getContext('2d'),vCtx=volCvs?.getContext('2d');
+  const W=canvas.width,H=canvas.height,candles=chartCandles,n=candles.length;
+  if(!n)return;
+  const highs=candles.map(c=>c.h),lows=candles.map(c=>c.l);
+  const maxP=Math.max(...highs),minP=Math.min(...lows),range=maxP-minP||1;
+  const pad={top:10,bottom:10,left:8,right:52};
+  const chartW=W-pad.left-pad.right,chartH=H-pad.top-pad.bottom;
+  const spacing=chartW/n,candleW=Math.max(1,Math.floor(spacing)-1);
+  const toY=price=>H-pad.bottom-((price-minP)/range*chartH);
+  ctx.clearRect(0,0,W,H);
+  // Grid
+  ctx.strokeStyle='rgba(30,45,69,.5)';ctx.lineWidth=1;ctx.setLineDash([2,4]);
+  ctx.font='9px IBM Plex Mono';ctx.fillStyle='#4a6080';ctx.textAlign='right';
+  for(let i=0;i<=4;i++){
+    const price=minP+(range*i/4);const y=toY(price);
+    ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right+4,y);ctx.stroke();
+    ctx.fillText(price<1?price.toFixed(4):price.toFixed(2),W-2,y+3);
+  }
+  ctx.setLineDash([]);
+  // Candles
+  candles.forEach((c,i)=>{
+    const x=pad.left+i*spacing+spacing/2,bull=c.c>=c.o;
+    const color=bull?'#39ff14':'#ff3c3c';
+    const bodyT=toY(Math.max(c.o,c.c)),bodyB=toY(Math.min(c.o,c.c)),bodyH=Math.max(1,bodyB-bodyT);
+    ctx.strokeStyle=color;ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(x,toY(c.h));ctx.lineTo(x,toY(c.l));ctx.stroke();
+    ctx.fillStyle=bull?'rgba(57,255,20,.85)':'rgba(255,60,60,.85)';
+    ctx.fillRect(x-candleW/2,bodyT,candleW,bodyH);
+    ctx.strokeStyle=color;ctx.lineWidth=0.5;ctx.strokeRect(x-candleW/2,bodyT,candleW,bodyH);
+  });
+  // Volume
+  if(vCtx){
+    vCtx.clearRect(0,0,volCvs.width,36);
+    const maxVol=Math.max(...candles.map(c=>c.v));
+    candles.forEach((c,i)=>{
+      const x=pad.left+i*spacing+spacing/2,bull=c.c>=c.o,vh=Math.max(1,(c.v/maxVol)*30);
+      vCtx.fillStyle=bull?'rgba(57,255,20,.3)':'rgba(255,60,60,.3)';
+      vCtx.fillRect(x-candleW/2,36-vh,candleW,vh);
+    });
+  }
+  canvas._candles=candles;canvas._spacing=spacing;canvas._padLeft=pad.left;canvas._toY=toY;canvas._candleW=candleW;
+}
+
+function onChartMouseMove(e){
+  const canvas=document.getElementById('candlestick-canvas');
+  if(!canvas._candles)return;
+  const rect=canvas.getBoundingClientRect(),mouseX=e.clientX-rect.left;
+  const i=Math.floor((mouseX-canvas._padLeft)/canvas._spacing);
+  const candles=canvas._candles;
+  if(i<0||i>=candles.length){onChartMouseLeave();return;}
+  const c=candles[i],x=canvas._padLeft+i*canvas._spacing+canvas._spacing/2;
+  const fmt=v=>v<1?v.toFixed(4):v.toFixed(2);
+  const fmtV=v=>v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(1)+'K':v.toFixed(0);
+  const cross=document.getElementById('chart-crosshair');
+  if(cross){cross.style.display='block';cross.style.left=x+'px';}
+  const tip=document.getElementById('chart-tooltip'),wrap=document.getElementById('chart-canvas-wrap');
+  if(!tip)return;
+  const bull=c.c>=c.o;
+  document.getElementById('tt-open').textContent='$'+fmt(c.o);
+  document.getElementById('tt-high').textContent='$'+fmt(c.h);
+  document.getElementById('tt-low').textContent='$'+fmt(c.l);
+  const closeEl=document.getElementById('tt-close');
+  closeEl.textContent='$'+fmt(c.c);closeEl.style.color=bull?'var(--neon)':'var(--danger)';
+  document.getElementById('tt-vol').textContent=fmtV(c.v);
+  tip.style.display='block';
+  const tipX=x+10+140>wrap.clientWidth?x-150:x+10;
+  tip.style.left=tipX+'px';tip.style.top='8px';
+}
+function onChartMouseLeave(){
+  const cross=document.getElementById('chart-crosshair');if(cross)cross.style.display='none';
+  const tip=document.getElementById('chart-tooltip');if(tip)tip.style.display='none';
+}
+function chartNextPair(){
+  const pairs=getChartPairs();if(!pairs.length)return;
+  chartPairIndex=(chartPairIndex+1)%pairs.length;loadCandlestickChart();
+}
+function chartPrevPair(){
+  const pairs=getChartPairs();if(!pairs.length)return;
+  chartPairIndex=(chartPairIndex-1+pairs.length)%pairs.length;loadCandlestickChart();
+}
+function setChartTF(tf,btn){
+  chartTF=tf;
+  document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  loadCandlestickChart();
+}
+function showChartError(msg){
+  const l=document.getElementById('chart-loading');
+  if(l){l.innerHTML='<span style="font-family:var(--mono);font-size:10px;color:var(--danger)">⛔ '+msg+'</span>';l.style.display='flex';}
+}
 
 function savePairs(){localStorage.setItem('snipbot_pairs',JSON.stringify(activePairs));}
 function addPair(){
@@ -891,16 +1059,8 @@ async function refreshAll(){
   document.getElementById('refresh-indicator').style.display='none';
 }
 
-buildChart();
-renderPairs();
-
-// إخفاء LOADING بعد 5 ثواني في أي حال
-setTimeout(() => {
-  const ind = document.getElementById('refresh-indicator');
-  if (ind) ind.style.display = 'none';
-}, 5000);
-
-setTimeout(() => refreshAll(), 1000);setInterval(refreshAll,REFRESH_MS);
+buildChart();renderPairs();refreshAll();
+setInterval(refreshAll,REFRESH_MS);
 setInterval(loadAgents,30000);
 setInterval(addSnippet,25000);
 </script>
