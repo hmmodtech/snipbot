@@ -436,7 +436,27 @@ def exchange_balance():
     except Exception as e:
         log.error(f"[Proxy] exchange_balance error: {e}", exc_info=True)
         return jsonify({"status": "error", "error": str(e)[:200]}), 500
-
+@app.route("/api/ohlcv")
+def ohlcv():
+    symbol    = request.args.get("symbol",    "ADA/USDT")
+    timeframe = request.args.get("timeframe", "1h")
+    limit     = int(request.args.get("limit", "100"))
+    try:
+        exchange = ccxt.kucoin({
+            "enableRateLimit": True,
+            "options": {"defaultType": "spot"},
+        })
+        raw = exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
+        exchange.close()
+        candles = [{
+            "t": c[0], "o": float(c[1]), "h": float(c[2]),
+            "l": float(c[3]), "c": float(c[4]), "v": float(c[5]),
+        } for c in raw]
+        return jsonify({"status": "live", "symbol": symbol,
+                        "timeframe": timeframe, "candles": candles})
+    except Exception as e:
+        log.error(f"[Proxy] OHLCV error: {e}")
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 if __name__ == "__main__":
     log.info(f"[SnipBot Proxy]: Starting on port {PORT}")
