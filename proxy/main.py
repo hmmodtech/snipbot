@@ -436,27 +436,55 @@ def exchange_balance():
     except Exception as e:
         log.error(f"[Proxy] exchange_balance error: {e}", exc_info=True)
         return jsonify({"status": "error", "error": str(e)[:200]}), 500
+# ══════════════════════════════════════════════
+# Route — OHLCV Candlestick Data (KuCoin Live)
+# ══════════════════════════════════════════════
 @app.route("/api/ohlcv")
 def ohlcv():
-    symbol    = request.args.get("symbol",    "ADA/USDT")
+    symbol    = request.args.get("symbol", "ADA/USDT").replace("%2F", "/").replace(" ", "/")
     timeframe = request.args.get("timeframe", "1h")
-    limit     = int(request.args.get("limit", "100"))
+    limit     = int(request.args.get("limit", "80"))
+    
+    # تصحيح صيغة الزوج
+    if "/" not in symbol and "USDT" in symbol:
+        symbol = symbol.replace("USDT", "/USDT")
+
     try:
-        exchange = ccxt.kucoin({
+        ex = ccxt.kucoin({
             "enableRateLimit": True,
             "options": {"defaultType": "spot"},
+            "timeout": 10000,
         })
-        raw = exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
-        exchange.close()
-        candles = [{
-            "t": c[0], "o": float(c[1]), "h": float(c[2]),
-            "l": float(c[3]), "c": float(c[4]), "v": float(c[5]),
-        } for c in raw]
-        return jsonify({"status": "live", "symbol": symbol,
-                        "timeframe": timeframe, "candles": candles})
+        
+        raw = ex.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
+        
+        candles = []
+        for c in raw:
+            candles.append({
+                "t": int(c[0]),
+                "o": float(c[1]),
+                "h": float(c[2]),
+                "l": float(c[3]),
+                "c": float(c[4]),
+                "v": float(c[5]),
+            })
+
+        log.info(f"🔎 [Proxy OHLCV]: Fetched {len(candles)} candles for {symbol} ({timeframe})")
+        return jsonify({
+            "status": "live",
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "candles": candles
+        })
+
     except Exception as e:
-        log.error(f"[Proxy] OHLCV error: {e}")
-        return jsonify({"status": "error", "error": str(e)}), 500
+        log.error(f"⛔ [Proxy OHLCV Error] {symbol}: {e}")
+        return jsonify({
+            "status": "error",
+            "symbol": symbol,
+            "error": str(e),
+            "candles": []
+        }), 500
 
 if __name__ == "__main__":
     log.info(f"[SnipBot Proxy]: Starting on port {PORT}")
