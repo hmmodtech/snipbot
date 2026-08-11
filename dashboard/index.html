@@ -363,51 +363,52 @@ const REFRESH_MS=15000;
       </div>
     </div>
     <div class="g2">
+      <!-- CANDLESTICK CHART WIDGET -->
       <div class="card">
-        <div class="ch"><span class="ct">Portfolio Performance</span>
-          <div style="display:flex;gap:4px;">
-            <button class="btn btn-ghost" style="padding:2px 7px;font-size:9px" onclick="setRange('1D')">1D</button>
-            <button class="btn btn-ghost" style="padding:2px 7px;font-size:9px" onclick="setRange('1W')">1W</button>
-            <button class="btn btn-ghost" style="padding:2px 7px;font-size:9px" onclick="setRange('1M')">1M</button>
+        <div class="ch">
+          <span class="ct">🎯 Live Candlestick Scope</span>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <select class="pair-select" id="chart-pair-select" onchange="selectChartPair(this.value)" style="padding:2px 6px;font-size:10px;">
+              <!-- Dynamic Options Filled By JS -->
+            </select>
           </div>
         </div>
-        <!-- Candlestick Chart -->
-      <div class="chart-header">
-        <div class="chart-pair-nav">
-          <button class="nav-arrow" onclick="chartPrevPair()">&#8592;</button>
-          <div>
-            <div class="chart-pair-name" id="chart-pair-name">ADA/USDT</div>
-            <div style="display:flex;gap:6px;align-items:center;margin-top:2px;">
-              <span class="chart-pair-price" id="chart-pair-price">—</span>
-              <span class="chart-pair-change up" id="chart-pair-change">—</span>
+        <div class="chart-header">
+          <div class="chart-pair-nav">
+            <button class="nav-arrow" onclick="chartPrevPair()">&#8592;</button>
+            <div>
+              <div class="chart-pair-name" id="chart-pair-name">BTC/USDT</div>
+              <div style="display:flex;gap:6px;align-items:center;justify-content:center;margin-top:2px;">
+                <span class="chart-pair-price" id="chart-pair-price">—</span>
+                <span class="chart-pair-change up" id="chart-pair-change">—</span>
+              </div>
+            </div>
+            <button class="nav-arrow" onclick="chartNextPair()">&#8594;</button>
+          </div>
+          <div class="tf-btns">
+            <button class="tf-btn active" onclick="setChartTF('15m',this)">15m</button>
+            <button class="tf-btn" onclick="setChartTF('1h',this)">1H</button>
+            <button class="tf-btn" onclick="setChartTF('4h',this)">4H</button>
+            <button class="tf-btn" onclick="setChartTF('1d',this)">1D</button>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap" id="chart-canvas-wrap">
+          <canvas id="candlestick-canvas"></canvas>
+          <div class="chart-crosshair" id="chart-crosshair"></div>
+          <div class="chart-tooltip" id="chart-tooltip">
+            <div class="chart-tooltip-row"><span class="chart-tooltip-label">O</span><span id="tt-open">—</span></div>
+            <div class="chart-tooltip-row"><span class="chart-tooltip-label">H</span><span id="tt-high" style="color:var(--neon)">—</span></div>
+            <div class="chart-tooltip-row"><span class="chart-tooltip-label">L</span><span id="tt-low" style="color:var(--danger)">—</span></div>
+            <div class="chart-tooltip-row"><span class="chart-tooltip-label">C</span><span id="tt-close">—</span></div>
+            <div style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px;" class="chart-tooltip-row">
+              <span class="chart-tooltip-label">Vol</span><span id="tt-vol" style="color:var(--amber)">—</span>
             </div>
           </div>
-          <button class="nav-arrow" onclick="chartNextPair()">&#8594;</button>
-        </div>
-        <div class="tf-btns">
-          <button class="tf-btn active" onclick="setChartTF('15m',this)">15m</button>
-          <button class="tf-btn" onclick="setChartTF('1h',this)">1H</button>
-          <button class="tf-btn" onclick="setChartTF('4h',this)">4H</button>
-          <button class="tf-btn" onclick="setChartTF('1d',this)">1D</button>
-        </div>
-      </div>
-      <div class="chart-canvas-wrap" id="chart-canvas-wrap">
-        <canvas id="candlestick-canvas"></canvas>
-        <div class="chart-crosshair" id="chart-crosshair"></div>
-        <div class="chart-tooltip" id="chart-tooltip">
-          <div class="chart-tooltip-row"><span class="chart-tooltip-label">O</span><span id="tt-open">—</span></div>
-          <div class="chart-tooltip-row"><span class="chart-tooltip-label">H</span><span id="tt-high" style="color:var(--neon)">—</span></div>
-          <div class="chart-tooltip-row"><span class="chart-tooltip-label">L</span><span id="tt-low" style="color:var(--danger)">—</span></div>
-          <div class="chart-tooltip-row"><span class="chart-tooltip-label">C</span><span id="tt-close">—</span></div>
-          <div style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px;" class="chart-tooltip-row">
-            <span class="chart-tooltip-label">Vol</span><span id="tt-vol" style="color:var(--amber)">—</span>
+          <div class="chart-loading" id="chart-loading">
+            <div class="loading"><div class="spin"></div>Loading KuCoin...</div>
           </div>
         </div>
-        <div class="chart-loading" id="chart-loading">
-          <div class="loading"><div class="spin"></div>Loading...</div>
-        </div>
-      </div>
-      <div class="chart-vol-wrap"><canvas id="volume-canvas"></canvas></div>
+        <div class="chart-vol-wrap"><canvas id="volume-canvas"></canvas></div>
       </div>
       <div class="card">
         <div class="ch"><span class="ct">Risk Metrics</span>
@@ -638,7 +639,7 @@ const REFRESH_MS=15000;
 let API=typeof PROXY_URL!=='undefined'?PROXY_URL:'https://snipbot-proxy.up.railway.app';
 let AGENT_API=typeof AGENTS_URL!=='undefined'?AGENTS_URL:'https://snipbot-agents.up.railway.app';
 let upSec=0,currentExchangeId='kucoin';
-let activePairs=JSON.parse(localStorage.getItem('snipbot_pairs')||'["BTC/USDT","ETH/USDT","BNB/USDT","SOL/USDT"]');
+let activePairs=JSON.parse(localStorage.getItem('snipbot_pairs')||'["BTC/USDT","ETH/USDT","BNB/USDT","SOL/USDT","ADA/USDT","XRP/USDT"]');
 let exchanges=JSON.parse(localStorage.getItem('snipbot_exchanges')||'[]');
 let paperEnabled=localStorage.getItem('snipbot_paper')!=='false';
 let realEnabled=localStorage.getItem('snipbot_real')==='true';
@@ -768,9 +769,23 @@ async function loadRisk(){
    CANDLESTICK CHART ENGINE
 ════════════════════════════════════════ */
 let chartPairIndex=0,chartTF='15m',chartCandles=[];
-function getChartPairs(){return activePairs.length>0?[...activePairs]:['ADA/USDT','XRP/USDT'];}
+function getChartPairs(){return activePairs.length>0?[...activePairs]:['BTC/USDT','ETH/USDT','BNB/USDT','SOL/USDT','ADA/USDT','XRP/USDT'];}
 function buildChart(){initCandlestickChart();}
 function setRange(){}
+
+function updateChartPairSelect() {
+  const select = document.getElementById('chart-pair-select');
+  if(!select) return;
+  const pairs = getChartPairs();
+  select.innerHTML = pairs.map((p, idx) => 
+    `<option value="${idx}" ${idx === chartPairIndex ? 'selected' : ''}>${p}</option>`
+  ).join('');
+}
+
+function selectChartPair(index) {
+  chartPairIndex = parseInt(index) || 0;
+  loadCandlestickChart();
+}
 
 async function initCandlestickChart(){
   chartPairIndex=0;loadCandlestickChart();
@@ -782,8 +797,11 @@ async function initCandlestickChart(){
 
 async function loadCandlestickChart(){
   const pairs = getChartPairs();
-  const pair = pairs[chartPairIndex] || 'ADA/USDT';
+  if (chartPairIndex >= pairs.length) chartPairIndex = 0;
   
+  updateChartPairSelect();
+  
+  const pair = pairs[chartPairIndex] || 'BTC/USDT';
   const nameEl = document.getElementById('chart-pair-name');
   if(nameEl) nameEl.textContent = pair;
   
@@ -927,8 +945,9 @@ function addPair(){
   activePairs.push(val);savePairs();renderPairs();input.value='';
   showToast('✅ '+val+' added');
   sendTelegramNotification('💱 <b>[SnipBot]: New pair added</b>\n🎯 <b>Pair:</b> '+val+'\n🏦 <b>Exchange:</b> '+exch+'\n📋 <b>Mode:</b> '+mode);
+  loadCandlestickChart(); // تحديث شارت الشموع فوراً
 }
-function removePair(pair){activePairs=activePairs.filter(p=>p!==pair);savePairs();renderPairs();showToast('🗑 '+pair+' removed','amber');}
+function removePair(pair){activePairs=activePairs.filter(p=>p!==pair);savePairs();renderPairs();showToast('🗑 '+pair+' removed','amber');loadCandlestickChart();}
 function renderPairs(){
   const list=document.getElementById('pairs-list'),body=document.getElementById('pairs-table-body'),chip=document.getElementById('pairs-count-chip');
   if(!list||!body)return;chip.textContent=activePairs.length+' PAIRS';
