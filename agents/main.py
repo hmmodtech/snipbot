@@ -1,3 +1,4 @@
+import os
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import time
@@ -78,6 +79,7 @@ def evaluate_agent_signal(agent_id, pair):
     }
     return signals.get(agent_id, {"signal": 0, "confidence": 50, "reason": "Standby"})
 
+@app.route('/', methods=['GET'])
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({"status": "ONLINE", "service": "snipbot-agents", "agents_count": len(AGENTS_REGISTRY)}), 200
@@ -129,4 +131,6 @@ def evaluate_pair():
     }), 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    # ⚡ dynamic port assignment for Railway
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
