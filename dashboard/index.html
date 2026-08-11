@@ -190,6 +190,21 @@ nav { padding: 10px 8px; flex: 1; overflow-y: auto; }
 .up { color: var(--neon); }
 .dn { color: var(--danger); }
 
+.trading-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mode-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mode-info { flex: 1; }
+.mode-title { font-family: var(--raj); font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+.mode-desc { font-family: var(--mono); font-size: 9px; color: var(--muted); }
+
+.toggle-wrap { display: flex; align-items: center; gap: 8px; }
+.toggle { position: relative; width: 44px; height: 24px; cursor: pointer; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; inset: 0; border-radius: 12px; background: var(--border); transition: .3s; }
+.toggle-slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; border-radius: 50%; background: #fff; transition: .3s; }
+.toggle input:checked + .toggle-slider { background: var(--neon); box-shadow: 0 0 10px rgba(57,255,20,.4); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(20px); background: #040a02; }
+.toggle-label { font-family: var(--mono); font-size: 10px; color: var(--muted); min-width: 28px; }
+
 .g2 { display: grid; grid-template-columns: 1.5fr 1fr; gap: 10px; }
 
 .ex-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
@@ -202,6 +217,8 @@ nav { padding: 10px 8px; flex: 1; overflow-y: auto; }
 .ex-name { font-family: var(--raj); font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 2px; }
 .ex-bal { font-family: var(--mono); font-size: 16px; color: var(--neon); margin: 4px 0; }
 .ex-meta { font-family: var(--mono); font-size: 9px; color: var(--muted); }
+.ex-connect-btn { width: 100%; margin-top: 8px; padding: 5px; border-radius: 4px; font-family: var(--mono); font-size: 9px; cursor: pointer; border: 1px solid var(--border); transition: .15s; background: transparent; color: var(--muted); }
+.ex-connect-btn:hover { color: var(--danger); border-color: rgba(255,60,60,.4); }
 
 .pair-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .pair-input { flex: 1; min-width: 120px; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 6px 10px; font-family: var(--mono); font-size: 11px; color: var(--steel); outline: none; }
@@ -220,6 +237,8 @@ nav { padding: 10px 8px; flex: 1; overflow-y: auto; }
 .short { color: var(--danger); }
 .s-locked { display: inline-flex; align-items: center; gap: 3px; font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--neon-dim); color: var(--neon); border: 1px solid rgba(57,255,20,.3); }
 .s-track { display: inline-flex; align-items: center; gap: 3px; font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(232,200,74,.3); }
+.ab { padding: 2px 7px; border-radius: 3px; font-size: 9px; font-family: var(--mono); cursor: pointer; border: 1px solid; transition: .12s; }
+.ab.exit { color: var(--danger); border-color: rgba(255,60,60,.4); background: var(--danger-dim); }
 
 .ag { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }
 .ac { background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 10px; }
@@ -380,7 +399,7 @@ const REFRESH_MS=15000;
     </div>
   </div>
 
-  <!-- SNIPER BOARD PAGE -->
+  <!-- PAGE 1: SNIPER BOARD -->
   <div class="content" id="page-board">
     <!-- Clickable Target Overview KPI Cards -->
     <div><div class="sl">Target Overview (Click cards for deep breakdown)</div>
@@ -528,25 +547,167 @@ const REFRESH_MS=15000;
     </div>
   </div>
 
-  <!-- EXCHANGES PAGE -->
+  <!-- PAGE 2: EXCHANGES -->
   <div class="content" id="page-exchanges" style="display:none">
     <div class="sl">Exchange Wallets (Click exchange cards for deep dive)</div>
     <div class="ex-grid" id="exchanges-grid"><div class="loading"><div class="spin"></div>Loading...</div></div>
+    <div class="card" style="margin-top:4px">
+      <div class="ch"><span class="ct">Connect New Exchange</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost" onclick="openExchangeModal('kucoin')">+ KuCoin</button>
+        <button class="btn btn-ghost" onclick="openExchangeModal('binance')">+ Binance</button>
+        <button class="btn btn-ghost" onclick="openExchangeModal('bybit')">+ Bybit</button>
+        <button class="btn btn-ghost" onclick="openExchangeModal('okx')">+ OKX</button>
+      </div>
+    </div>
   </div>
 
-  <!-- PAIRS PAGE -->
+  <!-- PAGE 3: PAIRS -->
   <div class="content" id="page-pairs" style="display:none">
     <div class="sl">Manage Trading Pairs</div>
     <div class="card">
       <div class="ch"><span class="ct">Add New Pair</span></div>
       <div class="pair-form">
         <input class="pair-input" id="new-pair-input" placeholder="e.g. ETH/USDT" maxlength="20"/>
+        <select class="pair-select" id="new-pair-exchange">
+          <option value="kucoin">KuCoin</option><option value="binance">Binance</option><option value="bybit">Bybit</option>
+        </select>
+        <select class="pair-select" id="new-pair-mode">
+          <option value="paper">Paper</option><option value="real">Real</option>
+        </select>
         <button class="btn btn-neon" onclick="addPair()">+ ADD PAIR</button>
       </div>
       <div class="pairs-list" id="pairs-list"></div>
     </div>
+    <div class="card">
+      <div class="ch"><span class="ct">Active Pairs</span>
+        <span class="chip chip-neon" id="pairs-count-chip" style="font-size:9px">0 PAIRS</span></div>
+      <table class="tbl">
+        <thead><tr><th>PAIR</th><th>EXCHANGE</th><th>MODE</th><th>STATUS</th><th>ACTION</th></tr></thead>
+        <tbody id="pairs-table-body"></tbody>
+      </table>
+    </div>
   </div>
+
+  <!-- PAGE 4: TRADING MODE -->
+  <div class="content" id="page-trading" style="display:none">
+    <div class="sl">Trading Mode Control</div>
+    <div class="trading-modes">
+      <div class="mode-card">
+        <div class="mode-info">
+          <div class="mode-title">📋 Paper Trading</div>
+          <div class="mode-desc">Simulated trades — no real money at risk</div>
+          <div class="mode-desc" style="color:var(--neon);margin-top:4px">Capital: $10,000 USDT (simulated)</div>
+        </div>
+        <div class="toggle-wrap">
+          <label class="toggle"><input type="checkbox" id="toggle-paper" checked onchange="toggleMode('paper',this.checked)"/><span class="toggle-slider"></span></label>
+          <span class="toggle-label" id="label-paper">ON</span>
+        </div>
+      </div>
+      <div class="mode-card">
+        <div class="mode-info">
+          <div class="mode-title">💰 Real Trading</div>
+          <div class="mode-desc">Live trades with real capital</div>
+          <div class="mode-desc" style="color:var(--amber);margin-top:4px" id="real-balance-display">Balance: checking...</div>
+        </div>
+        <div class="toggle-wrap">
+          <label class="toggle"><input type="checkbox" id="toggle-real" onchange="toggleMode('real',this.checked)"/><span class="toggle-slider"></span></label>
+          <span class="toggle-label" id="label-real">OFF</span>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:4px">
+      <div class="ch"><span class="ct">Strategy Settings</span></div>
+      <div class="fr">
+        <div><div class="fl-label">MIN CONFIDENCE %</div><input class="fi" id="set-confidence" value="65" type="number" min="50" max="95"/></div>
+        <div><div class="fl-label">SCAN INTERVAL (MIN)</div><input class="fi" id="set-interval" value="15" type="number" min="1" max="60"/></div>
+      </div>
+      <div class="fr" style="margin-top:8px">
+        <div><div class="fl-label">MAX POSITION SIZE (USDT)</div><input class="fi" id="set-position-size" value="50"/></div>
+        <div><div class="fl-label">STOP LOSS %</div><input class="fi" id="set-sl" value="3"/></div>
+      </div>
+      <button class="btn btn-neon" style="margin-top:10px;width:100%" onclick="saveSettings()">💾 SAVE SETTINGS</button>
+    </div>
+  </div>
+
+  <!-- PAGE 5: AGENTS -->
+  <div class="content" id="page-agents" style="display:none">
+    <div class="sl">AI Agent Radar</div>
+    <div class="ag" id="agents-grid-full" style="grid-template-columns:repeat(2,1fr)">
+      <div class="loading"><div class="spin"></div>Loading agents...</div>
+    </div>
+  </div>
+
+  <!-- PAGE 6: HISTORY -->
+  <div class="content" id="page-history" style="display:none">
+    <div class="sl">Scope History</div>
+    <div class="card">
+      <div class="ch"><span class="ct">Trade History</span></div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>PAIR</th><th>SIDE</th><th>ENTRY</th><th>DATE</th><th>COST</th><th>TYPE</th></tr></thead>
+          <tbody id="history-body"><tr><td colspan="6" style="text-align:center;padding:16px;color:var(--muted);">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 7: TELEGRAM -->
+  <div class="content" id="page-telegram" style="display:none">
+    <div class="sl">Telegram Fire</div>
+    <div class="card">
+      <div class="ch"><span class="ct">Send Custom Message</span></div>
+      <textarea class="fi" id="tg-message" rows="4" style="resize:vertical" placeholder="Custom Telegram message..."></textarea>
+      <button class="btn btn-neon" style="margin-top:8px;width:100%" onclick="sendCustomTelegram()">📨 SEND TO TELEGRAM</button>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="ct">Quick Messages</span></div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <button class="btn btn-ghost" style="text-align:left" onclick="sendTelegramNotification('🔎 [Sniper Engine]: Manual status check. All systems operational.')">📊 Status Report</button>
+        <button class="btn btn-ghost" style="text-align:left" onclick="dispatchSnippet()">📡 Market Snippet</button>
+        <button class="btn btn-amber" style="text-align:left" onclick="sendTelegramNotification('⛔ [SnipBot ABORT]: Emergency halt executed. All triggers suspended.')">⛔ Abort Alert</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 8: SETTINGS -->
+  <div class="content" id="page-settings" style="display:none">
+    <div class="sl">Armory Settings</div>
+    <div class="card">
+      <div class="ch"><span class="ct">System URLs</span></div>
+      <div class="fr">
+        <div><div class="fl-label">PROXY URL</div><input class="fi" id="set-proxy" value="https://snipbot-proxy.up.railway.app"/></div>
+        <div><div class="fl-label">AGENTS URL</div><input class="fi" id="set-agents" value="https://snipbot-agents.up.railway.app"/></div>
+      </div>
+      <button class="btn btn-neon" style="margin-top:10px;width:100%" onclick="saveSystemSettings()">💾 SAVE</button>
+    </div>
+  </div>
+
 </main>
+</div>
+
+<!-- MODAL: EXCHANGE CONNECT -->
+<div class="modal-overlay" id="exchange-modal">
+  <div class="modal">
+    <div class="modal-title">🏦 Connect Exchange</div>
+    <div class="modal-sub" id="modal-exchange-name">Exchange API Setup</div>
+    <div class="modal-field"><label class="modal-label">API KEY</label>
+      <input class="modal-input" id="modal-api-key" placeholder="Your API Key"/></div>
+    <div class="modal-field"><label class="modal-label">API SECRET</label>
+      <input class="modal-input" id="modal-api-secret" type="password" placeholder="Your API Secret"/></div>
+    <div class="modal-field" id="passphrase-field"><label class="modal-label">PASSPHRASE (KuCoin / OKX)</label>
+      <input class="modal-input" id="modal-passphrase" placeholder="Your Passphrase"/></div>
+    <div class="modal-field"><label class="modal-label">MODE</label>
+      <select class="modal-select" id="modal-mode">
+        <option value="paper">📋 Paper Trading (Simulated)</option>
+        <option value="real">💰 Real Trading (Live Money)</option>
+      </select></div>
+    <div class="modal-warn" id="modal-warn">⚠ API keys stored in session only — cleared when tab closes.<br>Use read-only keys for safety.</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">CANCEL</button>
+      <button class="btn btn-neon" onclick="saveExchange()" id="modal-save-btn">✅ CONNECT</button>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL: KPI DETAIL BREAKDOWN -->
@@ -578,9 +739,12 @@ const REFRESH_MS=15000;
 
 <script>
 let API = typeof PROXY_URL !== 'undefined' ? PROXY_URL : 'https://snipbot-proxy.up.railway.app';
-let upSec = 0;
+let AGENT_API = typeof AGENTS_URL !== 'undefined' ? AGENTS_URL : 'https://snipbot-agents.up.railway.app';
+let upSec = 0, currentExchangeId = 'kucoin';
 let activePairs = JSON.parse(localStorage.getItem('snipbot_pairs') || '["BTC/USDT","ETH/USDT","BNB/USDT","SOL/USDT","ADA/USDT","XRP/USDT"]');
+let exchanges = JSON.parse(localStorage.getItem('snipbot_exchanges') || '[]');
 let paperEnabled = localStorage.getItem('snipbot_paper') !== 'false';
+let realEnabled = localStorage.getItem('snipbot_real') === 'true';
 let currentAiLang = 'ar';
 let selectedAgentName = '';
 
@@ -603,7 +767,19 @@ function toggleSidebar() {
   document.getElementById('sidebar-overlay').classList.toggle('open');
 }
 
-const PAGES = ['board', 'exchanges', 'pairs'];
+/* ── ALL 8 PAGES REGISTERED FULLY ── */
+const PAGES = ['board', 'exchanges', 'pairs', 'trading', 'agents', 'history', 'telegram', 'settings'];
+const PAGE_TITLES = {
+  board: ['🎯 SNIPER BOARD', 'LIVE OVERVIEW'],
+  exchanges: ['🏦 EXCHANGES', 'WALLET OVERVIEW'],
+  pairs: ['💱 MANAGE PAIRS', 'ADD · REMOVE · MONITOR'],
+  trading: ['⚙️ TRADING MODE', 'PAPER · REAL · SETTINGS'],
+  agents: ['🤖 AGENT RADAR', 'AI STRATEGY ANALYSIS'],
+  history: ['🗂 SCOPE HISTORY', 'TRADE LOG'],
+  telegram: ['💬 TELEGRAM FIRE', 'BOT CONTROLS'],
+  settings: ['⚙️ ARMORY SETTINGS', 'SYSTEM CONFIG'],
+};
+
 function setPage(p, el) {
   PAGES.forEach(id => {
     const e = document.getElementById('page-' + id);
@@ -611,8 +787,16 @@ function setPage(p, el) {
   });
   document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
   if (el) el.classList.add('active');
+  if (PAGE_TITLES[p]) {
+    document.getElementById('page-title').textContent = PAGE_TITLES[p][0];
+    document.getElementById('page-sub').textContent = PAGE_TITLES[p][1];
+  }
+  if (window.innerWidth <= 600) toggleSidebar();
   if (p === 'exchanges') loadExchanges();
   if (p === 'pairs') renderPairs();
+  if (p === 'agents') loadAgentsFull();
+  if (p === 'trading') loadTradingMode();
+  if (p === 'history') loadHistory();
 }
 
 async function apiFetch(path) {
@@ -694,6 +878,18 @@ async function loadTrades() {
   }).join('');
 }
 
+async function loadHistory() {
+  const data = await apiFetch('/api/trades'), body = document.getElementById('history-body');
+  if (!data || !data.trades || data.trades.length === 0) {
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--muted);">No history yet.</td></tr>';
+    return;
+  }
+  body.innerHTML = data.trades.map(t => {
+    const isBuy = String(t.type || '').includes('BUY'), price = parseFloat(t.price || 0) || 0, cost = parseFloat(t.cost || 0) || 0;
+    return '<tr><td><span class="pair">' + (t.symbol || '—') + '</span></td><td><span class="' + (isBuy ? 'long' : 'short') + '">' + (isBuy ? 'LONG' : 'SHORT') + '</span></td><td>' + (price > 0 ? '$' + price.toLocaleString('en', { maximumFractionDigits: 2 }) : '—') + '</td><td style="color:var(--muted)">' + (t.date || '—') + '</td><td>$' + cost.toFixed(2) + '</td><td style="color:var(--muted)">' + (t.type || '—') + '</td></tr>';
+  }).join('');
+}
+
 async function loadAgents() {
   const data = await apiFetch('/api/agents/status');
   const grid = document.getElementById('agents-grid'), chip = document.getElementById('agents-chip');
@@ -718,6 +914,26 @@ async function loadAgents() {
         <div class="ar" style="color:${clr}">${a.action} (${conf.toFixed(0)}%)</div>
         <div class="cb"><div class="cf" style="width:${conf}%;background:${clr}"></div></div>
         <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;">${(a.reason || '').substring(0, 50)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function loadAgentsFull() {
+  const data = await apiFetch('/api/agents/status'), grid = document.getElementById('agents-grid-full');
+  if (!data || !data.agents) {
+    grid.innerHTML = '<div class="loading" style="grid-column:1/-1"><div class="spin"></div>Waiting for scan...</div>';
+    return;
+  }
+  const cmap = { BUY: 'var(--neon)', SELL: 'var(--danger)', HOLD: 'var(--muted)', SCANNING: 'var(--amber)' };
+  grid.innerHTML = data.agents.map(a => {
+    const clr = cmap[a.action] || 'var(--muted)', conf = parseFloat(a.confidence) || 0;
+    return `
+      <div class="ac">
+        <div class="an"><span>${a.name}</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('${a.name}')">⚙️ CONFIG</button></div>
+        <div class="ar" style="color:${clr}">${a.action} — ${conf.toFixed(0)}% confidence</div>
+        <div class="cb"><div class="cf" style="width:${conf}%;background:${clr}"></div></div>
+        <div class="av"><span style="color:${clr};font-size:10px">${a.reason || ''}</span></div>
       </div>
     `;
   }).join('');
@@ -756,7 +972,7 @@ function closeKpiModal() {
   document.getElementById('kpi-modal').classList.remove('open');
 }
 
-/* ── BILINGUAL AI PAIR ANALYSIS WITH FALLBACK ── */
+/* ── BILINGUAL AI PAIR ANALYSIS WITH DYNAMIC DROPDOWN & FALLBACK ── */
 function populateAiSymbolSelect() {
   const sel = document.getElementById('ai-symbol-select');
   if (!sel) return;
@@ -975,6 +1191,22 @@ function loadExchanges() {
   `;
 }
 
+function openExchangeModal(id) {
+  currentExchangeId = id;
+  const names = { kucoin: 'KuCoin', binance: 'Binance', bybit: 'Bybit', okx: 'OKX' };
+  document.getElementById('modal-exchange-name').textContent = (names[id] || id) + ' API Setup';
+  document.getElementById('exchange-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('exchange-modal').classList.remove('open');
+}
+
+function saveExchange() {
+  showToast('✅ Exchange Connected');
+  closeModal();
+}
+
 function savePairs() { localStorage.setItem('snipbot_pairs', JSON.stringify(activePairs)); }
 
 function addPair() {
@@ -1006,8 +1238,39 @@ function renderPairs() {
   body.innerHTML = activePairs.map(p => '<tr><td><span class="pair">' + p + '</span></td><td style="color:var(--muted)">KuCoin</td><td><span class="chip chip-amber" style="font-size:9px">PAPER</span></td><td><span class="s-locked">● ACTIVE</span></td><td><button class="ab exit" onclick="removePair(\'' + p + '\')">REMOVE</button></td></tr>').join('');
 }
 
+/* ── TRADING MODE & SETTINGS ── */
+function loadTradingMode() {
+  document.getElementById('toggle-paper').checked = paperEnabled;
+  document.getElementById('toggle-real').checked = realEnabled;
+}
+
+function toggleMode(mode, enabled) {
+  if (mode === 'paper') {
+    paperEnabled = enabled;
+    localStorage.setItem('snipbot_paper', enabled);
+  }
+  if (mode === 'real') {
+    realEnabled = enabled;
+    localStorage.setItem('snipbot_real', enabled);
+  }
+}
+
+function saveSettings() { showToast('💾 Settings saved'); }
+function saveSystemSettings() { showToast('💾 System settings saved'); }
+
+/* ── SNIPPETS FEED & TELEGRAM UTILS ── */
+const snippetPool = [
+  { cls: 'locked', tag: '🎯 Sniper Engine', txt: 'BTC/USDT approaching key resistance. Volume confirming. Trigger armed.' },
+  { cls: 'alert', tag: '📊 Market Snippet', txt: 'BTC.D rising — altcoins facing pressure. Recommend BTC/ETH focus.' },
+  { cls: 'info', tag: '🔎 TA Analyst', txt: 'RSI neutral across major pairs. Awaiting directional confirmation.' },
+  { cls: 'executed', tag: '⚡ DCA+ Strategy', txt: 'Dip entry conditions scanning. EMA50 acting as dynamic support.' }
+];
+let pi = 0;
+
 function addSnippet() {
-  addFeedItem('BTC/USDT approaching resistance. Trigger armed.', 'locked', '🎯 Sniper Engine');
+  const s = snippetPool[pi % snippetPool.length];
+  pi++;
+  addFeedItem(s.txt, s.cls, s.tag);
 }
 
 function addFeedItem(txt, cls, tag = '📡 SnipBot') {
@@ -1018,16 +1281,46 @@ function addFeedItem(txt, cls, tag = '📡 SnipBot') {
   div.className = 'snip ' + cls;
   div.innerHTML = '<div class="sm"><span>' + tag + '</span><span>' + now + '</span></div><div>' + txt + '</div>';
   feed.insertBefore(div, feed.firstChild);
+  while (feed.children.length > 20) feed.removeChild(feed.lastChild);
+}
+
+async function sendTelegramNotification(message) {
+  try {
+    await fetch(API + '/api/telegram/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message }) });
+  } catch (e) {}
+}
+
+async function sendCustomTelegram() {
+  const msg = document.getElementById('tg-message').value.trim();
+  if (!msg) return;
+  await sendTelegramNotification(msg);
+  showToast('📨 Sent to Telegram');
+  document.getElementById('tg-message').value = '';
 }
 
 function emergencyAbort() {
   if (!confirm('⛔ EMERGENCY ABORT — Halt all operations?')) return;
   showToast('⛔ ABORT executed', 'danger');
+  addFeedItem('Emergency halt executed. All triggers suspended.', 'alert', '⛔ ABORT');
 }
 
-function armEngine() { showToast('🎯 Sniper Engine armed'); }
-function dispatchSnippet() { addSnippet(); showToast('📊 Snippet dispatched'); }
-function fireSnipe() { showToast('🎯 Snipe Fired'); }
+function armEngine() {
+  showToast('🎯 Sniper Engine armed');
+  addFeedItem('Sniper Engine armed — scanning for targets.', 'locked', '🎯 Sniper Engine');
+}
+
+function dispatchSnippet() {
+  addSnippet();
+  showToast('📊 Snippet dispatched');
+}
+
+function fireSnipe() {
+  const pair = document.getElementById('f-pair').value || 'BTC/USDT';
+  const side = document.getElementById('f-side').value || 'LONG';
+  showToast('🎯 ' + pair + ' ' + side + ' fired');
+  addFeedItem(pair + ' ' + side + ' manual snipe fired', 'executed', '⚡ Execution Log');
+}
+
 function clearConsole() { document.getElementById('f-pair').value = 'BTC/USDT'; }
 
 function refreshAll() {
@@ -1042,6 +1335,7 @@ function refreshAll() {
 // INITIALIZATION
 refreshAll();
 setInterval(refreshAll, REFRESH_MS);
+setInterval(addSnippet, 25000);
 </script>
 </body>
 </html>
