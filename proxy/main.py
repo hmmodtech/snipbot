@@ -405,7 +405,25 @@ def exchange_balance():
         })
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
+# ------------------------------------------------------------------
+# 🧠 8 AI AGENTS PROXY ENDPOINTS (UPDATED)
+# ------------------------------------------------------------------
+@app.route('/api/agents/status', methods=['GET'])
+def get_agents_status():
+    try:
+        resp = requests.get(f"{AGENTS_SERVICE_URL}/api/agents/status", timeout=5)
+        return jsonify(resp.json()), resp.status_code
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Agents Gateway Error: {str(e)}"}), 502
 
+@app.route('/api/agents/evaluate', methods=['GET', 'POST'])
+def evaluate_agents():
+    pair = request.args.get('pair', 'BTC/USDT')
+    try:
+        resp = requests.get(f"{AGENTS_SERVICE_URL}/api/agents/evaluate?pair={pair}", timeout=5)
+        return jsonify(resp.json()), resp.status_code
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Agents Evaluation Error: {str(e)}"}), 502
 
 if __name__ == "__main__":
     log.info(f"[SnipBot Proxy v5.2]: Dynamic Capital Sync ready on port {PORT}")
