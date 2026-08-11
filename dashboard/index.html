@@ -1,5 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
+<!-- 📱 SNIPBOT MOBILE RESPONSIVE CSS PATCH -->
+<style>
+@media (max-width: 768px) {
+  body, .dashboard-container, .main-layout, .app-wrapper {
+    flex-direction: column !important;
+    overflow-x: hidden !important;
+  }
+  
+  /* تحويل القائمة الجانبية لشريط أفقي علوي على الجوال */
+  .sidebar, .nav-sidebar {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    padding: 8px !important;
+  }
+
+  .sidebar-menu, .nav-menu {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    gap: 6px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .nav-item {
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* توسيع محتوى الشاشة والشارت ليأخذ 100% من العرض */
+  .main-content, .content-area, .dashboard-main {
+    width: 100% !important;
+    padding: 8px !important;
+  }
+
+  /* ترتيب الكروت لتظهر 2 في كل سطر بشكل مرتب */
+  .kpi-grid, .target-overview, .overview-cards {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  /* توسيع الرسم البياني للشمعات ليكون واضحاً */
+  .chart-container, #scopeChart, canvas {
+    width: 100% !important;
+    min-height: 260px !important;
+  }
+}
+</style>
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
