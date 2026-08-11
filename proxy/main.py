@@ -1,6 +1,6 @@
 """
 SnipBot API Proxy — v5.2
-Dynamic Capital Sync Update
+Dynamic Capital Sync Update & 8 AI Agents Gateway
 """
 
 from flask import Flask, jsonify, request
@@ -18,7 +18,9 @@ CORS(app)
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("SnipBot-Proxy")
 
+# 🌐 MICROSERVICES URLS & ENVIRONMENT CONFIG
 OCTOBOT_URL        = os.getenv("OCTOBOT_URL", "https://snipbot-y.up.railway.app")
+AGENTS_SERVICE_URL = os.getenv("AGENTS_SERVICE_URL", "https://agents-snipbot.up.railway.app")
 PORT               = int(os.getenv("PORT", 8080))
 AGENTS_FILE        = "/tmp/agents_store.json"
 AGENT_CONFIGS_FILE = "/tmp/agent_configs.json"
@@ -36,7 +38,6 @@ def get_base_capital():
         except ValueError:
             pass
 
-    # محاولة القراءة المباشرة من ملف config.json
     config_paths = ["user/config.json", "/app/user/config.json", "../user/config.json"]
     for path in config_paths:
         if os.path.exists(path):
@@ -50,7 +51,6 @@ def get_base_capital():
             except Exception as e:
                 log.warning(f"[Proxy Capital]: Could not parse {path}: {e}")
 
-    # محاولة استعلام OctoBot API المباشر
     try:
         r = requests.get(f"{OCTOBOT_URL}/api/portfolio", timeout=5)
         if r.status_code == 200:
@@ -60,7 +60,7 @@ def get_base_capital():
     except Exception:
         pass
 
-    return 30000.0  # القيمة المحدثة الافتراضية
+    return 30000.0
 
 
 # ══════════════════════════════════════════════
@@ -125,6 +125,7 @@ def health():
         "proxy":       "online",
         "octobot":     "connected" if trades_list is not None else "disconnected",
         "octobot_url": OCTOBOT_URL,
+        "agents_url":  AGENTS_SERVICE_URL,
         "timestamp":   datetime.utcnow().isoformat()
     })
 
@@ -134,6 +135,7 @@ def status():
     return jsonify({
         "proxy":   "online",
         "octobot": OCTOBOT_URL,
+        "agents":  AGENTS_SERVICE_URL,
         "time":    datetime.utcnow().isoformat()
     })
 
@@ -155,7 +157,6 @@ def portfolio():
         pnl          = round(total_sold - total_bought, 4)
         locked       = round(sum(float(o.get("cost", 0)) for o in orders_list), 2)
 
-        # قراءة رأس المال حركياً من الإعدادات المحدثة
         BASE_CAPITAL = get_base_capital()
         net_spent    = round(total_bought - total_sold, 2)
         free_usdt    = round(BASE_CAPITAL - net_spent - locked, 2)
@@ -221,8 +222,36 @@ def orders():
 
 
 # ══════════════════════════════════════════════
-# Routes — Agents Radar & Config
+# Routes — 8 AI Agents Radar & Config Gateways
 # ══════════════════════════════════════════════
+@app.route("/api/agents/status", methods=["GET"])
+def agents_status():
+    """Proxies live 8 agents status directly from agents-snipbot microservice with fallback."""
+    try:
+        resp = requests.get(f"{AGENTS_SERVICE_URL}/api/agents/status", timeout=5)
+        if resp.status_code == 200:
+            return jsonify(resp.json()), 200
+    except Exception as e:
+        log.warning(f"[Proxy] Direct agents fetch failed: {e}")
+
+    # Fallback to local agents store if service is offline
+    return jsonify({
+        "source":    "live_fallback",
+        "timestamp": _agents_store.get("timestamp"),
+        "agents":    _agents_store.get("strategies", []),
+        "signals":   _agents_store.get("signals", [])
+    })
+
+@app.route("/api/agents/evaluate", methods=["GET", "POST"])
+def evaluate_agents():
+    """Evaluates multi-agent consensus across all 8 agents."""
+    pair = request.args.get("pair", "BTC/USDT")
+    try:
+        resp = requests.get(f"{AGENTS_SERVICE_URL}/api/agents/evaluate?pair={pair}", timeout=5)
+        return jsonify(resp.json()), resp.status_code
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Agents Evaluation Error: {str(e)}"}), 502
+
 @app.route("/api/agents/update", methods=["POST"])
 def agents_update():
     global _agents_store
@@ -236,27 +265,6 @@ def agents_update():
         return jsonify({"status": "empty"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/agents/status")
-def agents_status():
-    if _agents_store["timestamp"] is None:
-        return jsonify({
-            "source":    "waiting",
-            "timestamp": None,
-            "agents": [
-                {"name": "TA Analyst", "action": "SCANNING", "confidence": 0, "reason": "Awaiting first scan cycle"},
-                {"name": "Smart DCA+", "action": "SCANNING", "confidence": 0, "reason": "Awaiting first scan cycle"}
-            ],
-            "signals": []
-        })
-    return jsonify({
-        "source":    "live",
-        "timestamp": _agents_store.get("timestamp"),
-        "agents":    _agents_store.get("strategies", []),
-        "signals":   _agents_store.get("signals", [])
-    })
-
 
 @app.route("/api/agents/config", methods=["GET", "POST"])
 def agent_config_handler():
@@ -405,25 +413,7 @@ def exchange_balance():
         })
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
-# ------------------------------------------------------------------
-# 🧠 8 AI AGENTS PROXY ENDPOINTS (UPDATED)
-# ------------------------------------------------------------------
-@app.route('/api/agents/status', methods=['GET'])
-def get_agents_status():
-    try:
-        resp = requests.get(f"{AGENTS_SERVICE_URL}/api/agents/status", timeout=5)
-        return jsonify(resp.json()), resp.status_code
-    except Exception as e:
-        return jsonify({"status": "error", "message": f"Agents Gateway Error: {str(e)}"}), 502
 
-@app.route('/api/agents/evaluate', methods=['GET', 'POST'])
-def evaluate_agents():
-    pair = request.args.get('pair', 'BTC/USDT')
-    try:
-        resp = requests.get(f"{AGENTS_SERVICE_URL}/api/agents/evaluate?pair={pair}", timeout=5)
-        return jsonify(resp.json()), resp.status_code
-    except Exception as e:
-        return jsonify({"status": "error", "message": f"Agents Evaluation Error: {str(e)}"}), 502
 
 if __name__ == "__main__":
     log.info(f"[SnipBot Proxy v5.2]: Dynamic Capital Sync ready on port {PORT}")
