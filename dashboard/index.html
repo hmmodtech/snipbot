@@ -1470,20 +1470,20 @@ setInterval(addSnippet, 25000);
 
 // 🎯 SnipBot Agent Radar Single-File Fix (Embedded Function)
 // 🎯 SnipBot Direct High-Availability Agent Radar Patch
+// 🎯 SnipBot Universal DOM Agent Radar Scanner
 async function fetchAndRenderAgentRadar() {
     try {
-        // Primary Attempt: Direct connection to Quantitative Engine
-        let response = await fetch('https://agents-snipbot.up.railway.app/api/agents/evaluate');
+        console.log("🔍 [SnipBot]: Fetching Agent Radar payload...");
         
-        // Secondary Fallback Attempt: Proxy Gateway
-        if (!response.ok) {
-            console.warn('⚠️ [SnipBot]: Direct endpoint 503/non-200, trying proxy fallback...');
+        let response;
+        try {
+            response = await fetch('https://agents-snipbot.up.railway.app/api/agents/evaluate');
+        } catch(e) {
             response = await fetch('https://snipbot-proxy.up.railway.app/api/agents/evaluate');
         }
 
         if (!response.ok) {
-            console.error('❌ [SnipBot]: Both endpoints returned non-200. Check Railway service status.');
-            return;
+            response = await fetch('https://snipbot-proxy.up.railway.app/api/agents/evaluate');
         }
 
         const jsonPayload = await response.json();
@@ -1500,11 +1500,24 @@ async function fetchAndRenderAgentRadar() {
             'risk_governor': 'Risk & Portfolio Governor'
         };
 
+        // 1. Update the top-right 'SCANNING' status badge to 'ONLINE'
+        document.querySelectorAll('button, span, div, a').forEach(el => {
+            if (el.children.length === 0 && el.innerText && el.innerText.trim() === 'SCANNING') {
+                el.innerText = 'ONLINE';
+                el.style.color = '#10B981';
+                el.style.borderColor = '#10B981';
+            }
+        });
+
+        // 2. Scan all page elements to match Agent Titles dynamically
+        const allElements = Array.from(document.querySelectorAll('*'));
+
         Object.keys(agentMap).forEach(agentKey => {
+            const agentName = agentMap[agentKey];
             const agentData = evaluations[agentKey] || {};
 
             const statusText = (agentData.signal || agentData.action || agentData.status || 'NEUTRAL').toUpperCase();
-
+            
             let confidence = 0;
             if (typeof agentData.confidence === 'number') {
                 confidence = agentData.confidence;
@@ -1514,26 +1527,40 @@ async function fetchAndRenderAgentRadar() {
                 confidence = Math.round(agentData.weight * 10);
             }
 
-            const agentElements = document.querySelectorAll('.agent-card, [data-agent], .bg-slate-800');
-            agentElements.forEach(card => {
-                if (card.innerText && card.innerText.includes(agentMap[agentKey])) {
-                    const subtext = card.querySelector('p, span, .status-text');
-                    if (subtext) {
-                        subtext.textContent = `${statusText} (${confidence}%)`;
-                        subtext.style.color = statusText === 'BUY' ? '#10B981' : (statusText === 'SELL' ? '#EF4444' : '#9CA3AF');
-                    }
+            // Match element containing exact Agent Name
+            allElements.forEach(el => {
+                if (el.children.length === 0 && el.innerText && el.innerText.trim() === agentName) {
+                    const cardContainer = el.closest('div');
+                    if (cardContainer) {
+                        // Update text node containing 'undefined' or '0%'
+                        const targetTextNodes = cardContainer.querySelectorAll('p, span, div, small');
+                        targetTextNodes.forEach(node => {
+                            if (node.innerText && (node.innerText.includes('undefined') || node.innerText.includes('0%') || node.innerText.includes('HOLD') || node.innerText.includes('NEUTRAL') || node.innerText.includes('BUY') || node.innerText.includes('SELL'))) {
+                                node.innerText = `${statusText} (${confidence}%)`;
+                                node.style.color = (statusText === 'BUY' || statusText === 'ACTIVE') ? '#10B981' : (statusText === 'SELL' ? '#EF4444' : '#9CA3AF');
+                            }
+                        });
 
-                    const progressBar = card.querySelector('.progress-bar, [style*="width"]');
-                    if (progressBar) {
-                        progressBar.style.width = `${Math.min(confidence, 100)}%`;
+                        // Update progress bar element
+                        const progressBar = cardContainer.querySelector('div[style*="width"], .progress-bar');
+                        if (progressBar) {
+                            progressBar.style.width = `${Math.min(confidence, 100)}%`;
+                        }
                     }
                 }
             });
         });
+
+        console.log("✅ [SnipBot]: Agent Radar UI updated successfully!");
+
     } catch (error) {
-        console.error('❌ [SnipBot UI Error]: Connection Exception:', error);
+        console.error('❌ [SnipBot UI Error]: Radar update error:', error);
     }
 }
+
+// Run immediately and loop every 10 seconds
+fetchAndRenderAgentRadar();
+setInterval(fetchAndRenderAgentRadar, 10000);
 </script>
 </body>
 </html>
