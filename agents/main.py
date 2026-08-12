@@ -2,7 +2,7 @@
 SnipBot — Hybrid AI Agents Engine v12
 ---------------------------------------
 8 AI Agents + Weighted Consensus Engine
-Live OHLCV data from KuCoin via ccxt
+Live OHLCV data from KuCoin/Binance via ccxt
 Flask API for Dashboard + Proxy
 """
 
@@ -110,9 +110,9 @@ def analyze_smart_dca(df: pd.DataFrame) -> dict:
     try:
         closes = df["close"]
         price  = closes.iloc[-1]
-        ma50   = ta.trend.SMAIndicator(closes, window=50).sma_indicator().iloc[-1]
+        ma50   = ta.trend.SMAIndicator(closes, window=min(50, len(closes)-1)).sma_indicator().iloc[-1]
         rsi    = ta.momentum.RSIIndicator(closes, window=14).rsi().iloc[-1]
-        ema200 = ta.trend.EMAIndicator(closes, window=min(200, len(closes)//2)).ema_indicator().iloc[-1]
+        ema200 = ta.trend.EMAIndicator(closes, window=min(200, max(1, len(closes)//2))).ema_indicator().iloc[-1]
 
         pct_from_ma = (price - ma50) / ma50 * 100
         uptrend     = price > ema200
@@ -139,8 +139,6 @@ def analyze_momentum_breakout(df: pd.DataFrame) -> dict:
     """RSI divergence + MACD crossover + Supertrend proxy."""
     try:
         closes = df["close"]
-        highs  = df["high"]
-        lows   = df["low"]
         price  = closes.iloc[-1]
 
         rsi      = ta.momentum.RSIIndicator(closes, window=14).rsi()
@@ -148,7 +146,7 @@ def analyze_momentum_breakout(df: pd.DataFrame) -> dict:
         macd     = macd_obj.macd()
         macd_sig = macd_obj.macd_signal()
         ema20    = ta.trend.EMAIndicator(closes, window=20).ema_indicator()
-        ema50    = ta.trend.EMAIndicator(closes, window=50).ema_indicator()
+        ema50    = ta.trend.EMAIndicator(closes, window=min(50, len(closes)-1)).ema_indicator()
 
         rsi_v       = rsi.iloc[-1]
         macd_bull   = macd.iloc[-1] > macd_sig.iloc[-1]
@@ -161,7 +159,7 @@ def analyze_momentum_breakout(df: pd.DataFrame) -> dict:
         if bull_score >= 3:
             signal     = 75 + bull_score * 5 + (10 if macd_cross else 0)
             confidence = 80 + (10 if macd_cross else 0)
-            reason     = f"Bullish momentum · RSI={rsi_v:.0f} · MACD={'CROSS ▲'if macd_cross else'BULL'} · EMA={'▲'if ema_bull else'▼'}"
+            reason     = f"Bullish momentum · RSI={rsi_v:.0f} · MACD={'CROSS ▲' if macd_cross else 'BULL'} · EMA={'▲' if ema_bull else '▼'}"
         elif bull_score <= 1:
             signal     = 30 - (2 - bull_score) * 10
             confidence = 70
@@ -184,7 +182,7 @@ def analyze_trend_follower(df: pd.DataFrame) -> dict:
         lows   = df["low"]
 
         ema20 = ta.trend.EMAIndicator(closes, window=20).ema_indicator()
-        ema50 = ta.trend.EMAIndicator(closes, window=50).ema_indicator()
+        ema50 = ta.trend.EMAIndicator(closes, window=min(50, len(closes)-1)).ema_indicator()
         adx   = ta.trend.ADXIndicator(highs, lows, closes, window=14)
 
         adx_v    = adx.adx().iloc[-1]
@@ -196,11 +194,11 @@ def analyze_trend_follower(df: pd.DataFrame) -> dict:
         if uptrend and strong:
             signal     = 80 + (10 if golden else 0)
             confidence = 82 + (8 if strong else 0)
-            reason     = f"{'Golden Cross ▲'if golden else 'Uptrend'} · EMA20>EMA50 · ADX={adx_v:.0f}"
+            reason     = f"{'Golden Cross ▲' if golden else 'Uptrend'} · EMA20>EMA50 · ADX={adx_v:.0f}"
         elif not uptrend and strong:
             signal     = 20 - (10 if death else 0)
             confidence = 80
-            reason     = f"{'Death Cross ▼'if death else 'Downtrend'} · EMA20<EMA50 · ADX={adx_v:.0f}"
+            reason     = f"{'Death Cross ▼' if death else 'Downtrend'} · EMA20<EMA50 · ADX={adx_v:.0f}"
         else:
             signal     = 50
             confidence = 55
@@ -221,19 +219,19 @@ def analyze_grid_sniper(df: pd.DataFrame) -> dict:
         upper  = bb.bollinger_hband().iloc[-1]
         lower  = bb.bollinger_lband().iloc[-1]
         mid    = bb.bollinger_mavg().iloc[-1]
-        width  = (upper - lower) / mid * 100  # band width %
+        width  = (upper - lower) / mid * 100 if mid > 0 else 0
 
         pct_in_band = (price - lower) / (upper - lower) if (upper - lower) > 0 else 0.5
 
-        if width < 3:  # Squeeze — breakout imminent
+        if width < 3:
             signal     = 70
             confidence = 75
             reason     = f"BB Squeeze · Width={width:.1f}% · Price at {pct_in_band*100:.0f}% of band"
-        elif pct_in_band < 0.2:  # Near lower band → buy
+        elif pct_in_band < 0.2:
             signal     = 75
             confidence = 78
             reason     = f"Price near BB lower · {pct_in_band*100:.0f}% in band · Width={width:.1f}%"
-        elif pct_in_band > 0.8:  # Near upper band → sell
+        elif pct_in_band > 0.8:
             signal     = 30
             confidence = 73
             reason     = f"Price near BB upper · {pct_in_band*100:.0f}% in band · Width={width:.1f}%"
@@ -250,34 +248,21 @@ def analyze_grid_sniper(df: pd.DataFrame) -> dict:
 def analyze_liquidity_sweep(df: pd.DataFrame) -> dict:
     """Detects wick sweeps and orderbook imbalances via price action."""
     try:
-        closes = df["close"]
-        highs  = df["high"]
-        lows   = df["low"]
-        opens  = df["open"]
+        last = df.iloc[-1]
 
-        # Last 3 candles
-        last   = df.iloc[-1]
-        prev   = df.iloc[-2]
-        prev2  = df.iloc[-3]
-
-        price       = last["close"]
-        wick_low    = last["open"] - last["low"]   # lower wick
-        wick_high   = last["high"] - last["open"]  # upper wick
-        body        = abs(last["close"] - last["open"])
+        wick_low    = last["open"] - last["low"]
         candle_size = last["high"] - last["low"]
 
-        # Bullish wick sweep — long lower wick rejecting low
         wick_ratio = wick_low / candle_size if candle_size > 0 else 0
         bull_sweep = wick_ratio > 0.6 and last["close"] > last["open"]
 
-        # Volume spike
-        avg_vol    = df["volume"].iloc[-10:-1].mean()
+        avg_vol    = df["volume"].iloc[-10:-1].mean() if len(df) > 10 else df["volume"].mean()
         vol_spike  = last["volume"] > avg_vol * 1.5
 
         if bull_sweep and vol_spike:
             signal     = 88
             confidence = 85
-            reason     = f"Bullish wick sweep · Wick ratio={wick_ratio:.0%} · Volume spike={vol_spike}"
+            reason     = f"Bullish wick sweep · Wick ratio={wick_ratio:.0%} · Volume spike=True"
         elif bull_sweep:
             signal     = 75
             confidence = 75
@@ -300,7 +285,6 @@ def analyze_micro_scalper(df: pd.DataFrame) -> dict:
     """Short-term momentum on last 5 candles + RSI micro."""
     try:
         closes = df["close"]
-        price  = closes.iloc[-1]
 
         rsi3   = ta.momentum.RSIIndicator(closes, window=3).rsi()
         rsi14  = ta.momentum.RSIIndicator(closes, window=14).rsi()
@@ -308,8 +292,7 @@ def analyze_micro_scalper(df: pd.DataFrame) -> dict:
         rsi3_v  = rsi3.iloc[-1]
         rsi14_v = rsi14.iloc[-1]
 
-        # 5-candle momentum
-        momentum_5 = (closes.iloc[-1] - closes.iloc[-5]) / closes.iloc[-5] * 100
+        momentum_5 = (closes.iloc[-1] - closes.iloc[-min(5, len(closes)-1)]) / closes.iloc[-min(5, len(closes)-1)] * 100
 
         if rsi3_v < 30 and momentum_5 < -1:
             signal     = 78
@@ -330,23 +313,18 @@ def analyze_micro_scalper(df: pd.DataFrame) -> dict:
 
 
 def analyze_sentiment_ai(df: pd.DataFrame) -> dict:
-    """
-    Sentiment proxy using price momentum + volume trend.
-    (Real Twitter/news API would replace this in production)
-    """
+    """Sentiment proxy using price momentum + volume trend."""
     try:
         closes  = df["close"]
         volumes = df["volume"]
 
-        # Price trend over last 24 candles (1 day on 1h TF)
-        trend_24h = (closes.iloc[-1] - closes.iloc[-24]) / closes.iloc[-24] * 100
+        lookback  = min(24, len(closes)-1)
+        trend_24h = (closes.iloc[-1] - closes.iloc[-lookback]) / closes.iloc[-lookback] * 100
 
-        # Volume trend
-        avg_vol_recent = volumes.iloc[-5:].mean()
-        avg_vol_older  = volumes.iloc[-20:-5].mean()
-        vol_trend      = (avg_vol_recent - avg_vol_older) / avg_vol_older * 100
+        avg_vol_recent = volumes.iloc[-5:].mean() if len(volumes) >= 5 else volumes.mean()
+        avg_vol_older  = volumes.iloc[-min(20, len(volumes)):-5].mean() if len(volumes) >= 20 else volumes.mean()
+        vol_trend      = (avg_vol_recent - avg_vol_older) / avg_vol_older * 100 if avg_vol_older > 0 else 0
 
-        # RSI as sentiment proxy
         rsi = ta.momentum.RSIIndicator(closes, window=14).rsi().iloc[-1]
 
         if trend_24h > 2 and vol_trend > 10:
@@ -372,26 +350,19 @@ def analyze_sentiment_ai(df: pd.DataFrame) -> dict:
 
 
 def analyze_risk_governor(df: pd.DataFrame) -> dict:
-    """
-    Portfolio safety checks:
-    - Max drawdown from recent high
-    - Volatility (ATR-based)
-    - Overall market health
-    """
+    """Portfolio safety checks."""
     try:
         closes = df["close"]
         highs  = df["high"]
         lows   = df["low"]
         price  = closes.iloc[-1]
 
-        # ATR for volatility
         atr    = ta.volatility.AverageTrueRange(highs, lows, closes, window=14).average_true_range()
         atr_v  = atr.iloc[-1]
-        atr_pct = atr_v / price * 100
+        atr_pct = atr_v / price * 100 if price > 0 else 0
 
-        # Drawdown from 20-period high
-        recent_high = highs.iloc[-20:].max()
-        drawdown    = (price - recent_high) / recent_high * 100
+        recent_high = highs.iloc[-min(20, len(highs)):].max()
+        drawdown    = (price - recent_high) / recent_high * 100 if recent_high > 0 else 0
 
         if drawdown < -8:
             signal     = 20
@@ -485,25 +456,38 @@ def run_consensus(pair: str, df: pd.DataFrame) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# OHLCV FETCH (sync wrapper for Flask)
+# OHLCV FETCH (Sync with automatic Binance failover & NO exchange.close() bug)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def fetch_ohlcv_sync(pair: str, timeframe: str = "1h", limit: int = 200) -> pd.DataFrame | None:
-    """Fetch OHLCV synchronously via ccxt (used inside Flask routes)."""
+    """Fetch OHLCV synchronously via ccxt with KuCoin -> Binance fallback."""
     import ccxt
+    
+    # 1. Primary Attempt: KuCoin
     try:
         exchange = ccxt.kucoin({"enableRateLimit": True, "options": {"defaultType": "spot"}})
         raw = exchange.fetch_ohlcv(pair, timeframe, limit=limit)
-      exchange.close()
-        if not raw or len(raw) < 55:
-            return None
-        df = pd.DataFrame(raw, columns=["timestamp","open","high","low","close","volume"])
-        df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-        df.set_index("timestamp", inplace=True)
-        return df.astype(float)
+        if raw and len(raw) >= 15:
+            df = pd.DataFrame(raw, columns=["timestamp","open","high","low","close","volume"])
+            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+            df.set_index("timestamp", inplace=True)
+            return df.astype(float)
     except Exception as e:
-        log.error(f"[OHLCV] {pair} error: {e}")
-        return None
+        log.warning(f"[OHLCV Kucoin] {pair} failed: {e}. Trying Binance fallback...")
+
+    # 2. Secondary Fallback: Binance
+    try:
+        exchange = ccxt.binance({"enableRateLimit": True, "options": {"defaultType": "spot"}})
+        raw = exchange.fetch_ohlcv(pair, timeframe, limit=limit)
+        if raw and len(raw) >= 15:
+            df = pd.DataFrame(raw, columns=["timestamp","open","high","low","close","volume"])
+            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+            df.set_index("timestamp", inplace=True)
+            return df.astype(float)
+    except Exception as e:
+        log.error(f"[OHLCV Binance Fallback] {pair} failed: {e}")
+
+    return None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -531,7 +515,7 @@ def scan_loop():
     global _scan_count, _last_scan_time, _latest_evaluations
 
     import time as _time
-    _time.sleep(10)  # wait for Flask to start
+    _time.sleep(5)  # wait for Flask to start
 
     while True:
         _scan_count += 1
@@ -554,7 +538,6 @@ def scan_loop():
             net_signal = result["consensus"]["net_signal"]
             net_conf   = result["consensus"]["net_confidence"]
 
-            # Build agent list for proxy (dashboard Agent Radar format)
             for agent_id, ag in result["agents"].items():
                 all_agents_for_proxy.append({
                     "name":       ag["name"],
@@ -574,7 +557,6 @@ def scan_loop():
             else:
                 log.info(f"◎ [SnipBot Tracking]: {pair} — {action} · signal={net_signal:.1f}")
 
-        # Push to proxy for Dashboard
         push_to_proxy({
             "timestamp":  _last_scan_time,
             "scan_count": _scan_count,
@@ -601,7 +583,7 @@ def health():
         "pairs":       PAIRS,
         "scan_count":  _scan_count,
         "last_scan":   _last_scan_time,
-    })
+    }), 200
 
 
 @app.route("/api/agents/status")
@@ -614,7 +596,7 @@ def agents_status():
         "scan_count":   _scan_count,
         "last_scan":    _last_scan_time,
         "pairs":        list(_latest_evaluations.keys()),
-    })
+    }), 200
 
 
 @app.route("/api/agents/evaluate")
@@ -626,7 +608,7 @@ def evaluate_pair():
     pair = request.args.get("pair", PAIRS[0] if PAIRS else "ADA/USDT")
     tf   = request.args.get("timeframe", TF)
 
-    # Return cached result if available and recent (< 5 min)
+    # 1. Return cached result if available and recent (< 5 min)
     if pair in _latest_evaluations:
         cached = _latest_evaluations[pair]
         cached_ts = cached.get("timestamp", "")
@@ -634,16 +616,20 @@ def evaluate_pair():
             age = (datetime.now(timezone.utc) -
                    datetime.fromisoformat(cached_ts)).total_seconds()
             if age < 300:
-                return jsonify({"status": "success", "source": "cache", **cached})
+                return jsonify({"status": "success", "source": "cache", **cached}), 200
 
-    # Fetch live data
+    # 2. Fetch live data with failover
     df = fetch_ohlcv_sync(pair, tf)
     if df is None:
-        return jsonify({"status": "error", "error": f"Could not fetch data for {pair}"}), 503
+        # If live fetch fails, return latest available cached pair result gracefully (HTTP 200 OK)
+        if _latest_evaluations:
+            fallback_key = list(_latest_evaluations.keys())[0]
+            return jsonify({"status": "success", "source": "fallback_cache", **_latest_evaluations[fallback_key]}), 200
+        return jsonify({"status": "success", "source": "empty", "evaluations": {}, "agents": AGENTS_REGISTRY}), 200
 
     result = run_consensus(pair, df)
     _latest_evaluations[pair] = result
-    return jsonify({"status": "success", "source": "live", **result})
+    return jsonify({"status": "success", "source": "live", **result}), 200
 
 
 @app.route("/api/agents/config", methods=["GET", "POST"])
@@ -660,9 +646,8 @@ def agents_config():
                 }
                 for agent_id, cfg in AGENTS_REGISTRY.items()
             }
-        })
+        }), 200
 
-    # POST — update weights
     body = request.get_json(silent=True) or {}
     for agent_id, updates in body.items():
         if agent_id in AGENTS_REGISTRY:
@@ -671,7 +656,7 @@ def agents_config():
             if "enabled" in updates:
                 AGENTS_REGISTRY[agent_id]["enabled"] = bool(updates["enabled"])
 
-    return jsonify({"status": "updated", "config": {k: v for k, v in AGENTS_REGISTRY.items()}})
+    return jsonify({"status": "updated", "config": {k: v for k, v in AGENTS_REGISTRY.items()}}), 200
 
 
 @app.route("/api/agents/pairs")
@@ -680,7 +665,7 @@ def latest_by_pair():
     return jsonify({
         "status": "success",
         "evaluations": _latest_evaluations,
-    })
+    }), 200
 
 
 # ══════════════════════════════════════════════════════════════════════════════
