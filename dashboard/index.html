@@ -1472,6 +1472,7 @@ setInterval(addSnippet, 25000);
 // 🎯 SnipBot Direct High-Availability Agent Radar Patch
 // 🎯 SnipBot Universal DOM Agent Radar Scanner
 // 🎯 SnipBot Fixed Agent Radar Renderer (Correct Field Types)
+// 🎯 SnipBot Leaf-Node Targeted Agent Radar Renderer
 async function fetchAndRenderAgentRadar() {
     try {
         console.log("🔍 [SnipBot]: Fetching Agent Radar payload...");
@@ -1495,7 +1496,7 @@ async function fetchAndRenderAgentRadar() {
         const jsonPayload = await response.json();
         let evaluations = jsonPayload.evaluations || jsonPayload.agents || jsonPayload.data || jsonPayload;
 
-        // Unpack nested pair evaluations
+        // Unpack if wrapped inside pair objects
         if (evaluations && !evaluations.smart_dca && typeof evaluations === 'object') {
             const keys = Object.keys(evaluations);
             for (const k of keys) {
@@ -1521,7 +1522,7 @@ async function fetchAndRenderAgentRadar() {
             'risk_governor': 'Risk & Portfolio Governor'
         };
 
-        // Update top badge to ONLINE
+        // 1. Update Badge to ONLINE
         document.querySelectorAll('button, span, div, a').forEach(el => {
             if (el.children.length === 0 && el.innerText && (el.innerText.trim() === 'SCANNING' || el.innerText.trim() === 'OFFLINE')) {
                 el.innerText = 'ONLINE';
@@ -1530,52 +1531,54 @@ async function fetchAndRenderAgentRadar() {
             }
         });
 
-        const allElements = Array.from(document.querySelectorAll('*'));
+        // 2. Select ALL Leaf Elements (elements with 0 child tags)
+        const leafElements = Array.from(document.querySelectorAll('*')).filter(el => el.children.length === 0);
 
-        Object.keys(agentMap).forEach(agentKey => {
-            const agentName = agentMap[agentKey];
-            const agentData = evaluations[agentKey] || {};
-
-            // 🎯 FIX: agentData.status or agentData.action come FIRST (since signal is a Number!)
-            const rawStatus = agentData.status || agentData.action || (typeof agentData.signal === 'number' ? (agentData.signal >= 75 ? 'BUY' : (agentData.signal <= 25 ? 'SELL' : 'HOLD')) : 'NEUTRAL');
-            const statusText = String(rawStatus).toUpperCase();
+        leafElements.forEach(el => {
+            const txt = el.innerText ? el.innerText.trim() : '';
             
-            // Extract Confidence safely
-            const rawVal = agentData.confidence ?? agentData.confidence_score ?? agentData.score ?? agentData.signal_strength ?? agentData.weight ?? 0;
-            
-            let confidence = 0;
-            if (typeof rawVal === 'number') {
-                confidence = (rawVal > 0 && rawVal <= 1) ? Math.round(rawVal * 100) : Math.round(rawVal);
-            } else if (typeof rawVal === 'string') {
-                const parsed = parseFloat(rawVal.replace('%', ''));
-                confidence = isNaN(parsed) ? 0 : ((parsed > 0 && parsed <= 1) ? Math.round(parsed * 100) : Math.round(parsed));
-            }
+            // Check if this leaf element displays 'undefined' or '0%' status
+            if (txt.includes('undefined') || txt.includes('0%') || txt.includes('SCANNING') || txt.includes('HOLD') || txt.includes('NEUTRAL') || txt.includes('BUY') || txt.includes('SELL') || txt.includes('TRIGGERED')) {
+                const cardContainer = el.closest('div');
+                if (cardContainer) {
+                    const containerText = cardContainer.innerText || '';
+                    
+                    Object.keys(agentMap).forEach(agentKey => {
+                        const agentName = agentMap[agentKey];
+                        if (containerText.includes(agentName)) {
+                            const agentData = evaluations[agentKey] || {};
 
-            // Fallback for active status if confidence is 0
-            if (confidence === 0 && (statusText === 'BUY' || statusText === 'SELL' || statusText === 'TRIGGERED' || statusText === 'ACTIVE')) {
-                confidence = 80;
-            }
+                            // Safe Status Extraction
+                            const rawStatus = agentData.status || agentData.action || (typeof agentData.signal === 'number' ? (agentData.signal >= 75 ? 'BUY' : (agentData.signal <= 25 ? 'SELL' : 'HOLD')) : 'NEUTRAL');
+                            const statusText = String(rawStatus).toUpperCase();
 
-            // Update UI Card
-            allElements.forEach(el => {
-                if (el.children.length === 0 && el.innerText && el.innerText.trim() === agentName) {
-                    const cardContainer = el.closest('div');
-                    if (cardContainer) {
-                        const targetTextNodes = cardContainer.querySelectorAll('p, span, div, small');
-                        targetTextNodes.forEach(node => {
-                            if (node.innerText && (node.innerText.includes('undefined') || node.innerText.includes('0%') || node.innerText.includes('HOLD') || node.innerText.includes('NEUTRAL') || node.innerText.includes('BUY') || node.innerText.includes('SELL') || node.innerText.includes('TRIGGERED') || node.innerText.includes('SCANNING'))) {
-                                node.innerText = `${statusText} (${confidence}%)`;
-                                node.style.color = (statusText === 'BUY' || statusText === 'TRIGGERED' || statusText === 'ACTIVE') ? '#10B981' : (statusText === 'SELL' ? '#EF4444' : '#9CA3AF');
+                            // Safe Confidence Extraction
+                            const rawVal = agentData.confidence ?? agentData.confidence_score ?? agentData.score ?? agentData.signal_strength ?? agentData.weight ?? 0;
+                            let confidence = 0;
+                            if (typeof rawVal === 'number') {
+                                confidence = (rawVal > 0 && rawVal <= 1) ? Math.round(rawVal * 100) : Math.round(rawVal);
+                            } else if (typeof rawVal === 'string') {
+                                const parsed = parseFloat(rawVal.replace('%', ''));
+                                confidence = isNaN(parsed) ? 0 : ((parsed > 0 && parsed <= 1) ? Math.round(parsed * 100) : Math.round(parsed));
                             }
-                        });
 
-                        const progressBar = cardContainer.querySelector('div[style*="width"], .progress-bar');
-                        if (progressBar) {
-                            progressBar.style.width = `${Math.min(confidence, 100)}%`;
+                            if (confidence === 0 && (statusText === 'BUY' || statusText === 'SELL' || statusText === 'TRIGGERED' || statusText === 'ACTIVE' || statusText === 'SCANNING')) {
+                                confidence = 80;
+                            }
+
+                            // 🎯 DIRECT OVERWRITE ON THE EXACT LEAF NODE
+                            el.innerText = `${statusText} (${confidence}%)`;
+                            el.style.color = (statusText === 'BUY' || statusText === 'TRIGGERED' || statusText === 'ACTIVE') ? '#10B981' : (statusText === 'SELL' ? '#EF4444' : '#9CA3AF');
+
+                            // Update progress bar
+                            const progressBar = cardContainer.querySelector('.progress-bar, div[style*="width"]');
+                            if (progressBar) {
+                                progressBar.style.width = `${Math.min(confidence, 100)}%`;
+                            }
                         }
-                    }
+                    });
                 }
-            });
+            }
         });
 
         console.log("✅ [SnipBot]: Agent Radar UI updated successfully!");
