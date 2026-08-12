@@ -102,11 +102,9 @@ AGENTS_REGISTRY = {
 
 # ══════════════════════════════════════════════════════════════════════════════
 # REAL AGENT EVALUATION FUNCTIONS
-# Each agent analyzes real OHLCV data and returns signal (-100 to +100)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def analyze_smart_dca(df: pd.DataFrame) -> dict:
-    """DCA — buys on dips below MA50, sells on recovery."""
     try:
         closes = df["close"]
         price  = closes.iloc[-1]
@@ -136,11 +134,8 @@ def analyze_smart_dca(df: pd.DataFrame) -> dict:
 
 
 def analyze_momentum_breakout(df: pd.DataFrame) -> dict:
-    """RSI divergence + MACD crossover + Supertrend proxy."""
     try:
         closes = df["close"]
-        price  = closes.iloc[-1]
-
         rsi      = ta.momentum.RSIIndicator(closes, window=14).rsi()
         macd_obj = ta.trend.MACD(closes, window_fast=12, window_slow=26, window_sign=9)
         macd     = macd_obj.macd()
@@ -159,7 +154,7 @@ def analyze_momentum_breakout(df: pd.DataFrame) -> dict:
         if bull_score >= 3:
             signal     = 75 + bull_score * 5 + (10 if macd_cross else 0)
             confidence = 80 + (10 if macd_cross else 0)
-            reason     = f"Bullish momentum · RSI={rsi_v:.0f} · MACD={'CROSS ▲' if macd_cross else 'BULL'} · EMA={'▲' if ema_bull else '▼'}"
+            reason     = f"Bullish momentum · RSI={rsi_v:.0f} · MACD={'CROSS ▲' if macd_cross else 'BULL'}"
         elif bull_score <= 1:
             signal     = 30 - (2 - bull_score) * 10
             confidence = 70
@@ -175,7 +170,6 @@ def analyze_momentum_breakout(df: pd.DataFrame) -> dict:
 
 
 def analyze_trend_follower(df: pd.DataFrame) -> dict:
-    """EMA Golden/Death cross with ADX trend strength."""
     try:
         closes = df["close"]
         highs  = df["high"]
@@ -210,7 +204,6 @@ def analyze_trend_follower(df: pd.DataFrame) -> dict:
 
 
 def analyze_grid_sniper(df: pd.DataFrame) -> dict:
-    """Bollinger Band squeeze + low volatility grid detection."""
     try:
         closes = df["close"]
         price  = closes.iloc[-1]
@@ -226,19 +219,19 @@ def analyze_grid_sniper(df: pd.DataFrame) -> dict:
         if width < 3:
             signal     = 70
             confidence = 75
-            reason     = f"BB Squeeze · Width={width:.1f}% · Price at {pct_in_band*100:.0f}% of band"
+            reason     = f"BB Squeeze · Width={width:.1f}% · Price at {pct_in_band*100:.0f}%"
         elif pct_in_band < 0.2:
             signal     = 75
             confidence = 78
-            reason     = f"Price near BB lower · {pct_in_band*100:.0f}% in band · Width={width:.1f}%"
+            reason     = f"Price near BB lower · {pct_in_band*100:.0f}% in band"
         elif pct_in_band > 0.8:
             signal     = 30
             confidence = 73
-            reason     = f"Price near BB upper · {pct_in_band*100:.0f}% in band · Width={width:.1f}%"
+            reason     = f"Price near BB upper · {pct_in_band*100:.0f}% in band"
         else:
             signal     = 50
             confidence = 60
-            reason     = f"Mid-band position · {pct_in_band*100:.0f}% · Width={width:.1f}%"
+            reason     = f"Mid-band position · {pct_in_band*100:.0f}%"
 
         return {"signal": round(signal, 1), "confidence": round(confidence, 1), "reason": reason}
     except Exception as e:
@@ -246,10 +239,8 @@ def analyze_grid_sniper(df: pd.DataFrame) -> dict:
 
 
 def analyze_liquidity_sweep(df: pd.DataFrame) -> dict:
-    """Detects wick sweeps and orderbook imbalances via price action."""
     try:
         last = df.iloc[-1]
-
         wick_low    = last["open"] - last["low"]
         candle_size = last["high"] - last["low"]
 
@@ -282,10 +273,8 @@ def analyze_liquidity_sweep(df: pd.DataFrame) -> dict:
 
 
 def analyze_micro_scalper(df: pd.DataFrame) -> dict:
-    """Short-term momentum on last 5 candles + RSI micro."""
     try:
         closes = df["close"]
-
         rsi3   = ta.momentum.RSIIndicator(closes, window=3).rsi()
         rsi14  = ta.momentum.RSIIndicator(closes, window=14).rsi()
 
@@ -313,7 +302,6 @@ def analyze_micro_scalper(df: pd.DataFrame) -> dict:
 
 
 def analyze_sentiment_ai(df: pd.DataFrame) -> dict:
-    """Sentiment proxy using price momentum + volume trend."""
     try:
         closes  = df["close"]
         volumes = df["volume"]
@@ -338,7 +326,7 @@ def analyze_sentiment_ai(df: pd.DataFrame) -> dict:
         elif trend_24h < -2:
             signal     = 30
             confidence = 72
-            reason     = f"Bearish sentiment · 24h={trend_24h:+.1f}% · Vol trend={vol_trend:+.0f}%"
+            reason     = f"Bearish sentiment · 24h={trend_24h:+.1f}%"
         else:
             signal     = 50
             confidence = 58
@@ -350,7 +338,6 @@ def analyze_sentiment_ai(df: pd.DataFrame) -> dict:
 
 
 def analyze_risk_governor(df: pd.DataFrame) -> dict:
-    """Portfolio safety checks."""
     try:
         closes = df["close"]
         highs  = df["high"]
@@ -515,7 +502,7 @@ def scan_loop():
     global _scan_count, _last_scan_time, _latest_evaluations
 
     import time as _time
-    _time.sleep(5)  # wait for Flask to start
+    _time.sleep(5)
 
     while True:
         _scan_count += 1
@@ -588,11 +575,38 @@ def health():
 
 @app.route("/api/agents/status")
 def agents_status():
-    """Returns all 8 agents registry + latest scan results."""
+    """Returns all 8 agents registry enriched with live evaluations for Dashboard refreshAll()."""
+    latest_evals = {}
+    if _latest_evaluations:
+        first_pair = list(_latest_evaluations.keys())[0]
+        latest_evals = _latest_evaluations[first_pair].get("agents", {})
+
+    enriched_agents = []
+    for agent_id, cfg in AGENTS_REGISTRY.items():
+        eval_data = latest_evals.get(agent_id, {})
+        sig = eval_data.get("signal", 50)
+        conf = eval_data.get("confidence", 75)
+        
+        # Determine status/action string for UI
+        action = "BUY" if sig >= MIN_SIGNAL else ("SELL" if sig <= (100 - MIN_SIGNAL) else "HOLD")
+        
+        enriched_agents.append({
+            "id":          agent_id,
+            "name":        cfg["name"],
+            "type":        cfg["type"],
+            "weight":      cfg["weight"],
+            "enabled":     cfg["enabled"],
+            "status":      action,
+            "action":      action,
+            "signal":      sig,
+            "confidence":  conf,
+            "reason":      eval_data.get("reason", "Active scanning"),
+        })
+
     return jsonify({
         "status":       "success",
-        "total_agents": len(AGENTS_REGISTRY),
-        "agents":       list(AGENTS_REGISTRY.values()),
+        "total_agents": len(enriched_agents),
+        "agents":       enriched_agents,
         "scan_count":   _scan_count,
         "last_scan":    _last_scan_time,
         "pairs":        list(_latest_evaluations.keys()),
@@ -601,14 +615,10 @@ def agents_status():
 
 @app.route("/api/agents/evaluate")
 def evaluate_pair():
-    """
-    On-demand evaluation for a specific pair with live data.
-    GET /api/agents/evaluate?pair=ADA/USDT&timeframe=1h
-    """
+    """On-demand evaluation for a specific pair with live data."""
     pair = request.args.get("pair", PAIRS[0] if PAIRS else "ADA/USDT")
     tf   = request.args.get("timeframe", TF)
 
-    # 1. Return cached result if available and recent (< 5 min)
     if pair in _latest_evaluations:
         cached = _latest_evaluations[pair]
         cached_ts = cached.get("timestamp", "")
@@ -618,10 +628,8 @@ def evaluate_pair():
             if age < 300:
                 return jsonify({"status": "success", "source": "cache", **cached}), 200
 
-    # 2. Fetch live data with failover
     df = fetch_ohlcv_sync(pair, tf)
     if df is None:
-        # If live fetch fails, return latest available cached pair result gracefully (HTTP 200 OK)
         if _latest_evaluations:
             fallback_key = list(_latest_evaluations.keys())[0]
             return jsonify({"status": "success", "source": "fallback_cache", **_latest_evaluations[fallback_key]}), 200
@@ -675,11 +683,9 @@ def latest_by_pair():
 if __name__ == "__main__":
     log.info(f"🎯 [SnipBot Agents v12]: Starting — {len(AGENTS_REGISTRY)} agents · {PAIRS}")
 
-    # Start background scan loop
     t = threading.Thread(target=scan_loop, daemon=True)
     t.start()
     log.info(f"🔎 [Sniper Engine]: Background scan loop started · interval={INTERVAL}s")
 
-    # Start Flask API
     log.info(f"🔎 [Sniper Engine]: Status API on port {PORT}")
     app.run(host="0.0.0.0", port=PORT, debug=False, use_reloader=False)
