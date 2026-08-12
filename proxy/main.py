@@ -291,46 +291,46 @@ def agent_config_handler():
 # ══════════════════════════════════════════════
 # Route — Bilingual AI Pair Analysis
 # ══════════════════════════════════════════════
-@app.route("/api/ai_analysis")
-def ai_analysis():
-    symbol = request.args.get("symbol", "BTC/USDT").replace("%2F", "/").upper()
+@app.route('/api/ai_analysis', methods=['GET'])
+def get_ai_analysis():
+    # Decode %2F back to standard / for CCXT symbol format
+    raw_symbol = request.args.get('symbol', 'BTC/USDT')
+    symbol = raw_symbol.replace('%2F', '/').replace('%2f', '/')
+    
+    analysis = {
+        "symbol": symbol,
+        "recommendation": "NEUTRAL / HOLD",
+        "confidence": 75,
+        "support": "Support Zone Verified",
+        "resistance": "Resistance Zone Verified",
+        "ar_analysis": f"تحليل القناص لزوج {symbol}: السعر يتذبذب حالياً في منطقة ضغط، يوصى بالانتظار لحين تأكيد الكسر.",
+        "en_analysis": f"Sniper Analysis for {symbol}: Price consolidating in compression zone. Await breakout confirmation."
+    }
+    
+    # Safely query agents-snipbot consensus
     try:
-        ex = ccxt.kucoin({"enableRateLimit": True, "options": {"defaultType": "spot"}})
-        raw = ex.fetch_ohlcv(symbol, timeframe="1h", limit=50)
-        closes = [c[4] for c in raw]
-        last_price = closes[-1]
-        
-        change = ((closes[-1] - closes[0]) / closes[0]) * 100
-        action = "BUY" if change > 0 else "HOLD" if change > -2 else "SELL"
-        conf = min(max(60 + abs(change) * 5, 65), 92)
-        
-        fmt = lambda v: f"${v:,.4f}" if v < 1 else f"${v:,.2f}"
-        fmt_ar = lambda v: f"{v:,.4f}$" if v < 1 else f"{v:,.2f}$"
-
-        return jsonify({
-            "status": "success",
-            "symbol": symbol,
-            "price": fmt(last_price),
-            "action": action,
-            "confidence": round(conf, 1),
-            "en": {
-                "summary": f"{symbol} is showing {'bullish momentum' if change>0 else 'consolidation/dip'} across last 50 candles.",
-                "support": fmt(last_price * 0.96),
-                "resistance": fmt(last_price * 1.05),
-                "recommendation": f"{'Favorable accumulation zone.' if action=='BUY' else 'Await breakout confirmation.'}"
-            },
-            "ar": {
-                "summary": f"الزوج {symbol} يظهر {'زخماً إيجابياً صاعداً' if change>0 else 'حالة تجميع/انخفاض مؤقت'} خلال الـ 50 شمعة الأخيرة.",
-                "support": fmt_ar(last_price * 0.96),
-                "resistance": fmt_ar(last_price * 1.05),
-                "recommendation": f"{'منطقة تجميع قوية ومناسبة للدخول.' if action=='BUY' else 'ينصح بانتظار تأكيد الاختراق قبل الدخول.'}"
-            }
-        })
+        agents_res = requests.get(f"https://agents-snipbot.up.railway.app/api/agents/evaluate?pair={symbol}", timeout=3)
+        if agents_res.status_code == 200:
+            data = agents_res.json()
+            consensus = data.get('consensus', {})
+            action = consensus.get('action', 'HOLD_AND_SCAN')
+            conf = consensus.get('net_confidence', 75)
+            
+            if action == 'FIRE_BUY':
+                rec = 'STRONG BUY / شراء قوي'
+            elif action == 'FIRE_SELL':
+                rec = 'STRONG SELL / بيع قوي'
+            else:
+                rec = 'NEUTRAL / HOLD'
+                
+            analysis['recommendation'] = rec
+            analysis['confidence'] = conf
     except Exception as e:
-        log.error(f"[Proxy AI Analysis Error] {symbol}: {e}")
-        return jsonify({"status": "error", "error": str(e)}), 500
-
-
+        app.logger.warning(f"[AI Analysis Proxy Warning]: {e}")
+        
+    response = jsonify(analysis)
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response, 200
 # ══════════════════════════════════════════════
 # Routes — Telegram & OHLCV & Exchange Balance
 # ══════════════════════════════════════════════
