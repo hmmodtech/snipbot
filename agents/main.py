@@ -494,7 +494,7 @@ def fetch_ohlcv_sync(pair: str, timeframe: str = "1h", limit: int = 200) -> pd.D
     try:
         exchange = ccxt.kucoin({"enableRateLimit": True, "options": {"defaultType": "spot"}})
         raw = exchange.fetch_ohlcv(pair, timeframe, limit=limit)
-#      exchange.close()
+      exchange.close()
         if not raw or len(raw) < 55:
             return None
         df = pd.DataFrame(raw, columns=["timestamp","open","high","low","close","volume"])
