@@ -171,14 +171,12 @@ nav { padding: 10px 8px; flex: 1; overflow-y: auto; }
 .sl { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: .16em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .sl::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-/* Standardized Card Container Rules */
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; width: 100%; min-width: 0; box-sizing: border-box; }
 .ch { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; flex-wrap: wrap; }
 .ct { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
 
 .g5 { display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; width: 100%; min-width: 0; }
 
-/* Clickable KPI Cards */
 .ov { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; position: relative; overflow: hidden; cursor: pointer; transition: transform .15s, border-color .15s; min-width: 0; }
 .ov:hover { transform: translateY(-2px); border-color: var(--neon); }
 .ov::before { content: ''; position: absolute; top: 0; right: 0; width: 2px; height: 100%; }
@@ -228,7 +226,6 @@ nav { padding: 10px 8px; flex: 1; overflow-y: auto; }
 .pair-tag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; background: var(--neon-dim); border: 1px solid rgba(57,255,20,.3); font-family: var(--mono); font-size: 10px; color: var(--neon); }
 .pair-tag-remove { cursor: pointer; color: var(--danger); font-size: 12px; line-height: 1; padding: 0 2px; }
 
-/* Table Wrapping and Responsiveness */
 .tbl-wrap { width: 100%; min-width: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .tbl { width: 100%; border-collapse: collapse; }
 .tbl th { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; padding: 5px 8px; border-bottom: 1px solid var(--border); text-align: left; font-weight: 500; white-space: nowrap; }
@@ -240,7 +237,6 @@ nav { padding: 10px 8px; flex: 1; overflow-y: auto; }
 .s-locked { display: inline-flex; align-items: center; gap: 3px; font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--neon-dim); color: var(--neon); border: 1px solid rgba(57,255,20,.3); }
 .s-track { display: inline-flex; align-items: center; gap: 3px; font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(232,200,74,.3); }
 
-/* Agent Radar Grid Rules */
 .ag { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; width: 100%; min-width: 0; }
 .ac { background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 10px; width: 100%; min-width: 0; overflow: hidden; }
 .an { font-family: var(--raj); font-size: 12px; font-weight: 700; color: #fff; margin-bottom: 2px; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
@@ -292,7 +288,6 @@ nav { padding: 10px 8px; flex: 1; overflow-y: auto; }
 .menu-btn { display: none; background: transparent; border: 1px solid var(--border); border-radius: 5px; padding: 4px 8px; cursor: pointer; color: var(--steel); font-size: 14px; align-items: center; justify-content: center; }
 .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 99; backdrop-filter: blur(2px); }
 
-/* CANDLESTICK CHART */
 .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; width: 100%; }
 .chart-pair-nav { display: flex; align-items: center; gap: 8px; }
 .nav-arrow { width: 26px; height: 26px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--steel); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: .15s; line-height: 1; font-family: sans-serif; }
@@ -312,7 +307,6 @@ nav { padding: 10px 8px; flex: 1; overflow-y: auto; }
 .chart-tooltip-label { color: var(--muted); }
 .chart-vol-wrap { height: 36px; margin-top: 3px; width: 100%; }
 
-/* AI Analysis Styling */
 .ai-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
 .ai-tab { padding: 4px 10px; border-radius: 4px; font-family: var(--mono); font-size: 10px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); }
 .ai-tab.active { border-color: var(--neon); color: var(--neon); background: var(--neon-dim); }
@@ -322,7 +316,6 @@ nav { padding: 10px 8px; flex: 1; overflow-y: auto; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-/* 📱 MOBILE & TABLET RESPONSIVE MEDIA QUERIES (PRECISION FIX) */
 @media (max-width: 1024px) {
   .g5 { grid-template-columns: repeat(3, 1fr); }
   .g2 { grid-template-columns: 1fr; width: 100%; }
@@ -335,9 +328,7 @@ nav { padding: 10px 8px; flex: 1; overflow-y: auto; }
   .layout { overflow: visible; height: auto; }
   .main { overflow: visible; height: auto; width: 100%; }
   .content { overflow-y: visible; padding: 10px 12px; gap: 10px; width: 100%; }
-  
   .menu-btn { display: inline-flex; }
-  
   .sidebar {
     position: fixed;
     top: 36px;
@@ -350,35 +341,25 @@ nav { padding: 10px 8px; flex: 1; overflow-y: auto; }
   }
   .sidebar.open { transform: translateX(0); }
   .sidebar-overlay.open { display: block; }
-
   .status-bar { padding: 0 10px; height: 38px; }
   .status-mid { display: none; }
   .topbar { padding: 8px 12px; flex-wrap: wrap; }
   .pt { font-size: 14px; }
   .ta { width: 100%; justify-content: flex-end; margin-top: 4px; }
-
-  /* MAPPED 100% MATCHING WIDGET SIZES FOR MOBILE */
   .g5 { grid-template-columns: repeat(2, 1fr); gap: 6px; width: 100%; }
   .g5 .ov:last-child { grid-column: span 2; }
-  
   .g2 { display: flex; flex-direction: column; width: 100%; gap: 10px; }
   .card { width: 100%; min-width: 0; padding: 12px; box-sizing: border-box; }
-
-  /* Agent Radar & Active Snipes Exact Alignment */
   .ag { grid-template-columns: 1fr; width: 100%; gap: 8px; }
   .ac { width: 100%; min-width: 0; padding: 8px 10px; }
-
   .ex-grid { grid-template-columns: 1fr; width: 100%; }
   .fr { grid-template-columns: 1fr; width: 100%; }
-
   .chart-header { flex-direction: column; align-items: flex-start; gap: 6px; width: 100%; }
   .chart-pair-nav { width: 100%; justify-content: space-between; }
   .tf-btns { width: 100%; justify-content: space-between; }
   .tf-btn { flex: 1; text-align: center; padding: 4px; }
-
   .tbl-wrap { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .tbl { width: 100%; min-width: 480px; }
-
   .modal { padding: 14px; max-width: 100%; }
 }
 
@@ -394,9 +375,9 @@ nav { padding: 10px 8px; flex: 1; overflow-y: auto; }
 </head>
 <body>
 <script>
-const PROXY_URL='https://snipbot-proxy.up.railway.app';
-const AGENTS_URL=PROXY_URL;
-const REFRESH_MS=15000;
+const PROXY_URL = 'https://snipbot-proxy.up.railway.app';
+const AGENTS_URL = 'https://agents-snipbot.up.railway.app';
+const REFRESH_MS = 15000;
 </script>
 
 <div class="status-bar">
@@ -473,7 +454,6 @@ const REFRESH_MS=15000;
 
   <!-- PAGE 1: SNIPER BOARD -->
   <div class="content" id="page-board">
-    <!-- Clickable Target Overview KPI Cards -->
     <div><div class="sl">Target Overview (Click cards for deep breakdown)</div>
       <div class="g5">
         <div class="ov neon" onclick="openKpiModal('capital')"><div class="ovl">Total Capital</div><div class="ovv" id="ov-capital">—</div><div class="ovd up" id="ov-capital-d">Loading...</div></div>
@@ -484,9 +464,7 @@ const REFRESH_MS=15000;
       </div>
     </div>
 
-    <!-- Candlestick Scope + Risk Metrics + AI Pair Intelligence -->
     <div class="g2">
-      <!-- Candlestick Scope -->
       <div class="card">
         <div class="ch">
           <span class="ct">🎯 Live Candlestick Scope</span>
@@ -530,16 +508,13 @@ const REFRESH_MS=15000;
         <div class="chart-vol-wrap"><canvas id="volume-canvas"></canvas></div>
       </div>
 
-      <!-- Right Column: Risk Metrics & AI Intelligence underneath -->
       <div style="display:flex;flex-direction:column;gap:10px;width:100%;min-width:0;">
-        <!-- Original Risk Metrics Card -->
         <div class="card">
           <div class="ch"><span class="ct">Risk Metrics</span>
             <span class="chip chip-neon" style="font-size:9px" id="risk-level">LOADING</span></div>
           <div id="risk-meters"><div class="loading"><div class="spin"></div>Loading...</div></div>
         </div>
 
-        <!-- Bilingual AI Pair Intelligence Widget -->
         <div class="card">
           <div class="ch">
             <span class="ct">🤖 AI Pair Intelligence (تحليل الذكاء الاصطناعي)</span>
@@ -559,7 +534,6 @@ const REFRESH_MS=15000;
       </div>
     </div>
 
-    <!-- Active Snipes & Agent Radar (Targeted Responsiveness Optimization) -->
     <div class="g2">
       <div class="card">
         <div class="ch"><span class="ct">⚡ Active Snipes Board</span>
@@ -577,11 +551,19 @@ const REFRESH_MS=15000;
       <div class="card">
         <div class="ch"><span class="ct">📡 Agent Radar</span>
           <span class="chip chip-amber" style="font-size:9px" id="agents-chip">SCANNING</span></div>
-        <div class="ag" id="agents-grid"><div class="loading"><div class="spin"></div>Loading agents...</div></div>
+        <div class="ag" id="agents-grid">
+          <div class="ac"><div class="an"><span>Smart DCA Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Smart DCA Agent')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
+          <div class="ac"><div class="an"><span>Technical Momentum Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Technical Momentum Agent')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
+          <div class="ac"><div class="an"><span>Trend Follower Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Trend Follower Agent')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
+          <div class="ac"><div class="an"><span>Grid Sniper Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Grid Sniper Agent')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
+          <div class="ac"><div class="an"><span>Liquidity Sweep Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Liquidity Sweep Agent')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
+          <div class="ac"><div class="an"><span>Micro-Scalper Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Micro-Scalper Agent')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
+          <div class="ac"><div class="an"><span>Sentiment AI Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Sentiment AI Agent')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
+          <div class="ac"><div class="an"><span>Risk & Portfolio Governor</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Risk & Portfolio Governor')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
+        </div>
       </div>
     </div>
 
-    <!-- Manual Snipe Console & Snippets Analytics Feed -->
     <div class="g2">
       <div class="card">
         <div class="ch"><span class="ct">🔫 Manual Snipe Console</span>
@@ -712,7 +694,7 @@ const REFRESH_MS=15000;
     </div>
   </div>
 
-  <!-- PAGE 6: HISTORY WITH UPGRADED COLUMNS -->
+  <!-- PAGE 6: HISTORY -->
   <div class="content" id="page-history" style="display:none">
     <div class="sl">Scope History (Completed & Closed Snipes Log)</div>
     <div class="card">
@@ -764,7 +746,7 @@ const REFRESH_MS=15000;
       <div class="ch"><span class="ct">System URLs</span></div>
       <div class="fr">
         <div><div class="fl-label">PROXY URL</div><input class="fi" id="set-proxy" value="https://snipbot-proxy.up.railway.app"/></div>
-        <div><div class="fl-label">AGENTS URL</div><input class="fi" id="set-agents" value="https://snipbot-agents.up.railway.app"/></div>
+        <div><div class="fl-label">AGENTS URL</div><input class="fi" id="set-agents" value="https://agents-snipbot.up.railway.app"/></div>
       </div>
       <button class="btn btn-neon" style="margin-top:10px;width:100%" onclick="saveSystemSettings()">💾 SAVE</button>
     </div>
@@ -820,7 +802,7 @@ const REFRESH_MS=15000;
 
 <script>
 let API = typeof PROXY_URL !== 'undefined' ? PROXY_URL : 'https://snipbot-proxy.up.railway.app';
-let AGENT_API = typeof AGENTS_URL !== 'undefined' ? AGENTS_URL : 'https://snipbot-agents.up.railway.app';
+let AGENT_API = typeof AGENTS_URL !== 'undefined' ? AGENTS_URL : 'https://agents-snipbot.up.railway.app';
 let upSec = 0, currentExchangeId = 'kucoin';
 let activePairs = JSON.parse(localStorage.getItem('snipbot_pairs') || '["BTC/USDT","ETH/USDT","BNB/USDT","SOL/USDT","ADA/USDT","XRP/USDT"]');
 let exchanges = JSON.parse(localStorage.getItem('snipbot_exchanges') || '[]');
@@ -848,7 +830,6 @@ function toggleSidebar() {
   document.getElementById('sidebar-overlay').classList.toggle('open');
 }
 
-/* ── ALL 8 PAGES REGISTERED FULLY ── */
 const PAGES = ['board', 'exchanges', 'pairs', 'trading', 'agents', 'history', 'telegram', 'settings'];
 const PAGE_TITLES = {
   board: ['🎯 SNIPER BOARD', 'LIVE OVERVIEW'],
@@ -875,7 +856,7 @@ function setPage(p, el) {
   if (window.innerWidth <= 768) toggleSidebar();
   if (p === 'exchanges') loadExchanges();
   if (p === 'pairs') renderPairs();
-  if (p === 'agents') loadAgentsFull();
+  if (p === 'agents') fetchAndRenderAgentRadar();
   if (p === 'trading') loadTradingMode();
   if (p === 'history') loadHistory();
 }
@@ -959,7 +940,6 @@ async function loadTrades() {
   }).join('');
 }
 
-/* ── UPGRADED SCOPE HISTORY WITH 3 NEW COLUMNS (ENTRY/EXIT, P&L %, P&L $) ── */
 async function loadHistory() {
   const data = await apiFetch('/api/trades');
   const body = document.getElementById('history-body');
@@ -997,62 +977,12 @@ async function loadHistory() {
   }).join('');
 }
 
-async function loadAgents() {
-  const data = await apiFetch('/api/agents/status');
-  const grid = document.getElementById('agents-grid'), chip = document.getElementById('agents-chip');
-  if (!data || !data.agents || data.agents.length === 0) {
-    chip.textContent = 'AWAITING SCAN';
-    grid.innerHTML = `
-      <div class="ac"><div class="an"><span>TA Analyst</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('TA Analyst')">⚙️ CONFIG</button></div><div class="ar">RSI · EMA · MACD</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div></div>
-      <div class="ac"><div class="an"><span>Smart DCA+</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Smart DCA+')">⚙️ CONFIG</button></div><div class="ar">DIP ENTRY · RECOVERY</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div></div>
-    `;
-    return;
-  }
-  if (data.source === 'live' && data.timestamp) {
-    chip.textContent = 'LAST: ' + new Date(data.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    chip.className = 'chip chip-neon';
-  }
-  const cmap = { BUY: 'var(--neon)', SELL: 'var(--danger)', HOLD: 'var(--muted)', SCANNING: 'var(--amber)' };
-  grid.innerHTML = data.agents.map(a => {
-    const clr = cmap[a.action] || 'var(--muted)', conf = parseFloat(a.confidence) || 0;
-    return `
-      <div class="ac">
-        <div class="an"><span>${a.name}</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('${a.name}')">⚙️ CONFIG</button></div>
-        <div class="ar" style="color:${clr}">${a.action} (${conf.toFixed(0)}%)</div>
-        <div class="cb"><div class="cf" style="width:${conf}%;background:${clr}"></div></div>
-        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${(a.reason || '').substring(0, 50)}</div>
-      </div>
-    `;
-  }).join('');
-}
-
-async function loadAgentsFull() {
-  const data = await apiFetch('/api/agents/status'), grid = document.getElementById('agents-grid-full');
-  if (!data || !data.agents) {
-    grid.innerHTML = '<div class="loading" style="grid-column:1/-1"><div class="spin"></div>Waiting for scan...</div>';
-    return;
-  }
-  const cmap = { BUY: 'var(--neon)', SELL: 'var(--danger)', HOLD: 'var(--muted)', SCANNING: 'var(--amber)' };
-  grid.innerHTML = data.agents.map(a => {
-    const clr = cmap[a.action] || 'var(--muted)', conf = parseFloat(a.confidence) || 0;
-    return `
-      <div class="ac">
-        <div class="an"><span>${a.name}</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('${a.name}')">⚙️ CONFIG</button></div>
-        <div class="ar" style="color:${clr}">${a.action} — ${conf.toFixed(0)}% confidence</div>
-        <div class="cb"><div class="cf" style="width:${conf}%;background:${clr}"></div></div>
-        <div class="av"><span style="color:${clr};font-size:10px">${a.reason || ''}</span></div>
-      </div>
-    `;
-  }).join('');
-}
-
 async function loadRisk() {
   document.getElementById('risk-level').textContent = 'LOW RISK';
   const RISKS = [{ l: 'Drawdown', v: '2.1%', pct: 2, clr: 'var(--neon)' }, { l: 'Exposure', v: '0%', pct: 0, clr: 'var(--amber)' }, { l: 'Volatility', v: 'Med', pct: 45, clr: 'var(--green)' }, { l: 'Win Rate', v: 'N/A', pct: 0, clr: 'var(--muted)' }];
   document.getElementById('risk-meters').innerHTML = RISKS.map(r => '<div class="rr"><div class="rl">' + r.l + '</div><div class="rb"><div class="rf" style="width:' + r.pct + '%;background:' + r.clr + '"></div></div><div class="rv" style="color:' + r.clr + '">' + r.v + '</div></div>').join('');
 }
 
-/* ── KPI CLICKABLE MODAL ── */
 function openKpiModal(type) {
   const title = document.getElementById('kpi-modal-title'), content = document.getElementById('kpi-modal-content');
   const modal = document.getElementById('kpi-modal');
@@ -1079,7 +1009,6 @@ function closeKpiModal() {
   document.getElementById('kpi-modal').classList.remove('open');
 }
 
-/* ── BILINGUAL AI PAIR ANALYSIS ── */
 function populateAiSymbolSelect() {
   const sel = document.getElementById('ai-symbol-select');
   if (!sel) return;
@@ -1101,20 +1030,24 @@ function setAiLanguage(lang) {
   if (window.lastAiData) renderAiData(window.lastAiData);
 }
 
-async function runAiPairAnalysis() {
+async function runAiPairAnalysis(targetSymbol) {
   populateAiSymbolSelect();
   const sel = document.getElementById('ai-symbol-select');
-  const sym = (sel && sel.value) ? sel.value : 'BTC/USDT';
+  const sym = targetSymbol || ((sel && sel.value) ? sel.value : 'BTC/USDT');
+  if (sel && sel.value !== sym) sel.value = sym;
+  
   const box = document.getElementById('ai-analysis-box');
   box.innerHTML = '<div class="loading"><div class="spin"></div>Analyzing AI metrics for ' + sym + '...</div>';
   
   try {
     const res = await fetch(API + '/api/ai_analysis?symbol=' + encodeURIComponent(sym));
-    const data = await res.json();
-    if (data.status === 'success' && data.symbol === sym) {
-      window.lastAiData = data;
-      renderAiData(data);
-      return;
+    if (res.ok) {
+      const data = await res.json();
+      if (data && (data.status === 'success' || data.symbol)) {
+        window.lastAiData = data;
+        renderAiData(data);
+        return;
+      }
     }
   } catch (e) {}
 
@@ -1161,22 +1094,21 @@ function generateDynamicAiAnalysis(sym) {
 function renderAiData(data) {
   const box = document.getElementById('ai-analysis-box');
   const info = currentAiLang === 'ar' ? data.ar : data.en;
-  const isBuy = data.action === 'BUY';
+  const isBuy = data.action === 'BUY' || (data.recommendation && data.recommendation.includes('BUY'));
   box.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-      <b style="font-size:12px;color:#fff">${data.symbol} — ${data.price}</b>
-      <span class="chip ${isBuy ? 'chip-neon' : 'chip-amber'}">${data.action} (${data.confidence}%)</span>
+      <b style="font-size:12px;color:#fff">${data.symbol} — ${data.price || ''}</b>
+      <span class="chip ${isBuy ? 'chip-neon' : 'chip-amber'}">${data.action || 'HOLD'} (${data.confidence || 75}%)</span>
     </div>
-    <div style="margin-bottom:6px;color:var(--steel)">${info.summary}</div>
+    <div style="margin-bottom:6px;color:var(--steel)">${info ? info.summary : (data.ar_analysis || data.en_analysis || '')}</div>
     <div style="display:flex;gap:12px;margin-bottom:6px;">
-      <span style="color:var(--neon)">🎯 Support: ${info.support}</span>
-      <span style="color:var(--danger)">🚧 Resistance: ${info.resistance}</span>
+      <span style="color:var(--neon)">🎯 Support: ${info ? info.support : (data.support || 'Support Verified')}</span>
+      <span style="color:var(--danger)">🚧 Resistance: ${info ? info.resistance : (data.resistance || 'Resistance Verified')}</span>
     </div>
-    <div style="color:var(--amber);border-top:1px solid var(--border);padding-top:4px;">💡 ${info.recommendation}</div>
+    <div style="color:var(--amber);border-top:1px solid var(--border);padding-top:4px;">💡 ${info ? info.recommendation : (data.recommendation || 'Consolidation zone.')}</div>
   `;
 }
 
-/* ── AGENT CONFIG MODAL ── */
 function openAgentConfig(agentName) {
   selectedAgentName = agentName;
   document.getElementById('agent-config-title').textContent = '⚙️ Config: ' + agentName;
@@ -1196,7 +1128,7 @@ async function saveAgentConfig() {
   closeAgentConfigModal();
 }
 
-/* ── CANDLESTICK CHART JS ── */
+/* ── CANDLESTICK CHART JS & TRIPLE PAIR SYNC ── */
 let chartPairIndex = 0, chartTF = '15m', chartCandles = [];
 
 function getChartPairs() {
@@ -1212,7 +1144,12 @@ function updateChartPairSelect() {
 
 function selectChartPair(idx) {
   chartPairIndex = parseInt(idx) || 0;
+  const pairs = getChartPairs();
+  const selectedPair = pairs[chartPairIndex] || 'BTC/USDT';
+  
   loadCandlestickChart();
+  runAiPairAnalysis(selectedPair);
+  fetchAndRenderAgentRadar(selectedPair);
 }
 
 async function loadCandlestickChart() {
@@ -1278,15 +1215,13 @@ function drawCandlestick() {
 function chartNextPair() {
   const pairs = getChartPairs();
   if (!pairs.length) return;
-  chartPairIndex = (chartPairIndex + 1) % pairs.length;
-  loadCandlestickChart();
+  selectChartPair((chartPairIndex + 1) % pairs.length);
 }
 
 function chartPrevPair() {
   const pairs = getChartPairs();
   if (!pairs.length) return;
-  chartPairIndex = (chartPairIndex - 1 + pairs.length) % pairs.length;
-  loadCandlestickChart();
+  selectChartPair((chartPairIndex - 1 + pairs.length) % pairs.length);
 }
 
 function setChartTF(tf, btn) {
@@ -1304,7 +1239,6 @@ function showChartError(msg) {
   }
 }
 
-/* ── EXCHANGES & PAIRS PAGE ── */
 function loadExchanges() {
   const grid = document.getElementById('exchanges-grid');
   grid.innerHTML = `
@@ -1364,7 +1298,6 @@ function renderPairs() {
   body.innerHTML = activePairs.map(p => '<tr><td><span class="pair">' + p + '</span></td><td style="color:var(--muted)">KuCoin</td><td><span class="chip chip-amber" style="font-size:9px">PAPER</span></td><td><span class="s-locked">● ACTIVE</span></td><td><button class="ab exit" onclick="removePair(\'' + p + '\')">REMOVE</button></td></tr>').join('');
 }
 
-/* ── TRADING MODE & SETTINGS ── */
 function loadTradingMode() {
   document.getElementById('toggle-paper').checked = paperEnabled;
   document.getElementById('toggle-real').checked = realEnabled;
@@ -1384,7 +1317,6 @@ function toggleMode(mode, enabled) {
 function saveSettings() { showToast('💾 Settings saved'); }
 function saveSystemSettings() { showToast('💾 System settings saved'); }
 
-/* ── SNIPPETS FEED & TELEGRAM UTILS ── */
 const snippetPool = [
   { cls: 'locked', tag: '🎯 Sniper Engine', txt: 'BTC/USDT approaching key resistance. Volume confirming. Trigger armed.' },
   { cls: 'alert', tag: '📊 Market Snippet', txt: 'BTC.D rising — altcoins facing pressure. Recommend BTC/ETH focus.' },
@@ -1453,39 +1385,30 @@ function refreshAll() {
   loadPortfolio();
   loadTrades();
   loadRisk();
-  loadAgents();
+  fetchAndRenderAgentRadar();
   loadCandlestickChart();
   runAiPairAnalysis();
 }
 
-// WINDOW RESIZE EVENT FOR RESPONSIVE CANVAS
 window.addEventListener('resize', () => {
   drawCandlestick();
 });
 
-// INITIALIZATION
-refreshAll();
-setInterval(refreshAll, REFRESH_MS);
-setInterval(addSnippet, 25000);
-
-// 🎯 SnipBot Agent Radar Single-File Fix (Embedded Function)
-// 🎯 SnipBot Direct High-Availability Agent Radar Patch
-// 🎯 SnipBot Universal DOM Agent Radar Scanner
-// 🎯 SnipBot Fixed Agent Radar Renderer (Correct Field Types)
-// 🎯 SnipBot Leaf-Node Targeted Agent Radar Renderer
-async function fetchAndRenderAgentRadar() {
+// 🎯 SnipBot Unified Agent Radar Scanner
+async function fetchAndRenderAgentRadar(targetPair) {
     try {
-        console.log("🔍 [SnipBot]: Fetching Agent Radar payload...");
+        const pairs = getChartPairs();
+        const currentPair = targetPair || pairs[chartPairIndex] || 'BTC/USDT';
         
         let response;
         try {
-            response = await fetch('https://agents-snipbot.up.railway.app/api/agents/evaluate');
+            response = await fetch(`https://agents-snipbot.up.railway.app/api/agents/evaluate?pair=${encodeURIComponent(currentPair)}`);
         } catch(e) {
-            response = await fetch('https://snipbot-proxy.up.railway.app/api/agents/evaluate');
+            response = await fetch(`https://snipbot-proxy.up.railway.app/api/agents/evaluate?pair=${encodeURIComponent(currentPair)}`);
         }
 
         if (!response.ok) {
-            response = await fetch('https://snipbot-proxy.up.railway.app/api/agents/evaluate');
+            response = await fetch(`https://snipbot-proxy.up.railway.app/api/agents/evaluate?pair=${encodeURIComponent(currentPair)}`);
         }
 
         if (!response.ok) {
@@ -1496,7 +1419,6 @@ async function fetchAndRenderAgentRadar() {
         const jsonPayload = await response.json();
         let evaluations = jsonPayload.evaluations || jsonPayload.agents || jsonPayload.data || jsonPayload;
 
-        // Unpack if wrapped inside pair objects
         if (evaluations && !evaluations.smart_dca && typeof evaluations === 'object') {
             const keys = Object.keys(evaluations);
             for (const k of keys) {
@@ -1522,24 +1444,20 @@ async function fetchAndRenderAgentRadar() {
             'risk_governor': 'Risk & Portfolio Governor'
         };
 
-        // 1. Update Badge to ONLINE
-        document.querySelectorAll('button, span, div, a').forEach(el => {
-            if (el.children.length === 0 && el.innerText && (el.innerText.trim() === 'SCANNING' || el.innerText.trim() === 'OFFLINE')) {
-                el.innerText = 'ONLINE';
-                el.style.color = '#10B981';
-                el.style.borderColor = '#10B981';
-            }
-        });
+        // Update Badge to ONLINE
+        const chip = document.getElementById('agents-chip');
+        if (chip) {
+            chip.innerText = 'ONLINE';
+            chip.className = 'chip chip-neon';
+        }
 
-        // 2. Select ALL Leaf Elements (elements with 0 child tags)
         const leafElements = Array.from(document.querySelectorAll('*')).filter(el => el.children.length === 0);
 
         leafElements.forEach(el => {
             const txt = el.innerText ? el.innerText.trim() : '';
             
-            // Check if this leaf element displays 'undefined' or '0%' status
             if (txt.includes('undefined') || txt.includes('0%') || txt.includes('SCANNING') || txt.includes('HOLD') || txt.includes('NEUTRAL') || txt.includes('BUY') || txt.includes('SELL') || txt.includes('TRIGGERED')) {
-                const cardContainer = el.closest('div');
+                const cardContainer = el.closest('.ac') || el.closest('div');
                 if (cardContainer) {
                     const containerText = cardContainer.innerText || '';
                     
@@ -1548,11 +1466,9 @@ async function fetchAndRenderAgentRadar() {
                         if (containerText.includes(agentName)) {
                             const agentData = evaluations[agentKey] || {};
 
-                            // Safe Status Extraction
                             const rawStatus = agentData.status || agentData.action || (typeof agentData.signal === 'number' ? (agentData.signal >= 75 ? 'BUY' : (agentData.signal <= 25 ? 'SELL' : 'HOLD')) : 'NEUTRAL');
                             const statusText = String(rawStatus).toUpperCase();
 
-                            // Safe Confidence Extraction
                             const rawVal = agentData.confidence ?? agentData.confidence_score ?? agentData.score ?? agentData.signal_strength ?? agentData.weight ?? 0;
                             let confidence = 0;
                             if (typeof rawVal === 'number') {
@@ -1566,14 +1482,20 @@ async function fetchAndRenderAgentRadar() {
                                 confidence = 80;
                             }
 
-                            // 🎯 DIRECT OVERWRITE ON THE EXACT LEAF NODE
                             el.innerText = `${statusText} (${confidence}%)`;
                             el.style.color = (statusText === 'BUY' || statusText === 'TRIGGERED' || statusText === 'ACTIVE') ? '#10B981' : (statusText === 'SELL' ? '#EF4444' : '#9CA3AF');
 
+                            // Update Reason if available
+                            const reasonNode = cardContainer.querySelector('.av');
+                            if (reasonNode && agentData.reason) {
+                                reasonNode.innerText = agentData.reason;
+                            }
+
                             // Update progress bar
-                            const progressBar = cardContainer.querySelector('.progress-bar, div[style*="width"]');
+                            const progressBar = cardContainer.querySelector('.cf, .progress-bar, div[style*="width"]');
                             if (progressBar) {
                                 progressBar.style.width = `${Math.min(confidence, 100)}%`;
+                                progressBar.style.background = (statusText === 'BUY' || statusText === 'TRIGGERED' || statusText === 'ACTIVE') ? 'var(--neon)' : (statusText === 'SELL' ? 'var(--danger)' : 'var(--amber)');
                             }
                         }
                     });
@@ -1581,15 +1503,17 @@ async function fetchAndRenderAgentRadar() {
             }
         });
 
-        console.log("✅ [SnipBot]: Agent Radar UI updated successfully!");
+        console.log(`✅ [SnipBot]: Agent Radar UI updated successfully for ${currentPair}!`);
 
     } catch (error) {
         console.error('❌ [SnipBot UI Error]: Radar update error:', error);
     }
 }
 
-fetchAndRenderAgentRadar();
-setInterval(fetchAndRenderAgentRadar, 10000);
+// INITIALIZATION
+refreshAll();
+setInterval(refreshAll, REFRESH_MS);
+setInterval(addSnippet, 25000);
 </script>
 </body>
 </html>
