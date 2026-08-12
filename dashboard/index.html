@@ -1469,15 +1469,26 @@ setInterval(refreshAll, REFRESH_MS);
 setInterval(addSnippet, 25000);
 
 // 🎯 SnipBot Agent Radar Single-File Fix (Embedded Function)
+// 🎯 SnipBot Direct High-Availability Agent Radar Patch
 async function fetchAndRenderAgentRadar() {
     try {
-        const response = await fetch('/api/agents/evaluate');
-        const jsonPayload = await response.json();
+        // Primary Attempt: Direct connection to Quantitative Engine
+        let response = await fetch('https://agents-snipbot.up.railway.app/api/agents/evaluate');
+        
+        // Secondary Fallback Attempt: Proxy Gateway
+        if (!response.ok) {
+            console.warn('⚠️ [SnipBot]: Direct endpoint 503/non-200, trying proxy fallback...');
+            response = await fetch('https://snipbot-proxy.up.railway.app/api/agents/evaluate');
+        }
 
-        // Extract evaluations object cleanly
+        if (!response.ok) {
+            console.error('❌ [SnipBot]: Both endpoints returned non-200. Check Railway service status.');
+            return;
+        }
+
+        const jsonPayload = await response.json();
         const evaluations = jsonPayload.evaluations || jsonPayload.agents || jsonPayload.data || jsonPayload;
 
-        // Map of standard 8 Agents
         const agentMap = {
             'smart_dca': 'Smart DCA Agent',
             'momentum_breakout': 'Technical Momentum Agent',
@@ -1492,10 +1503,8 @@ async function fetchAndRenderAgentRadar() {
         Object.keys(agentMap).forEach(agentKey => {
             const agentData = evaluations[agentKey] || {};
 
-            // Determine status text
             const statusText = (agentData.signal || agentData.action || agentData.status || 'NEUTRAL').toUpperCase();
 
-            // Calculate confidence percentage
             let confidence = 0;
             if (typeof agentData.confidence === 'number') {
                 confidence = agentData.confidence;
@@ -1505,18 +1514,15 @@ async function fetchAndRenderAgentRadar() {
                 confidence = Math.round(agentData.weight * 10);
             }
 
-            // Update UI elements dynamically by finding text elements
             const agentElements = document.querySelectorAll('.agent-card, [data-agent], .bg-slate-800');
             agentElements.forEach(card => {
                 if (card.innerText && card.innerText.includes(agentMap[agentKey])) {
-                    // Update text status (e.g., BUY (85%))
                     const subtext = card.querySelector('p, span, .status-text');
                     if (subtext) {
                         subtext.textContent = `${statusText} (${confidence}%)`;
                         subtext.style.color = statusText === 'BUY' ? '#10B981' : (statusText === 'SELL' ? '#EF4444' : '#9CA3AF');
                     }
 
-                    // Update progress bar width
                     const progressBar = card.querySelector('.progress-bar, [style*="width"]');
                     if (progressBar) {
                         progressBar.style.width = `${Math.min(confidence, 100)}%`;
@@ -1525,13 +1531,9 @@ async function fetchAndRenderAgentRadar() {
             });
         });
     } catch (error) {
-        console.error('❌ [SnipBot UI Error]: Failed to fetch Agent Radar payload:', error);
+        console.error('❌ [SnipBot UI Error]: Connection Exception:', error);
     }
 }
-
-// Auto-run Agent Radar
-fetchAndRenderAgentRadar();
-setInterval(fetchAndRenderAgentRadar, 10000);
 </script>
 </body>
 </html>
