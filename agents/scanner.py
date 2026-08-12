@@ -65,4 +65,4 @@ class Scanner:
         return [s for s in results if s is not None and s.is_actionable()]
 
     async def close(self):
-        await self.exchange.close()
+     #   await self.exchange.close()
