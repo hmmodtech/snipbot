@@ -1471,6 +1471,7 @@ setInterval(addSnippet, 25000);
 // 🎯 SnipBot Agent Radar Single-File Fix (Embedded Function)
 // 🎯 SnipBot Direct High-Availability Agent Radar Patch
 // 🎯 SnipBot Universal DOM Agent Radar Scanner
+// 🎯 SnipBot Fixed Agent Radar Renderer (Correct Field Types)
 async function fetchAndRenderAgentRadar() {
     try {
         console.log("🔍 [SnipBot]: Fetching Agent Radar payload...");
@@ -1486,8 +1487,28 @@ async function fetchAndRenderAgentRadar() {
             response = await fetch('https://snipbot-proxy.up.railway.app/api/agents/evaluate');
         }
 
+        if (!response.ok) {
+            console.warn(`⚠️ [SnipBot]: Backend returned HTTP ${response.status}`);
+            return;
+        }
+
         const jsonPayload = await response.json();
-        const evaluations = jsonPayload.evaluations || jsonPayload.agents || jsonPayload.data || jsonPayload;
+        let evaluations = jsonPayload.evaluations || jsonPayload.agents || jsonPayload.data || jsonPayload;
+
+        // Unpack nested pair evaluations
+        if (evaluations && !evaluations.smart_dca && typeof evaluations === 'object') {
+            const keys = Object.keys(evaluations);
+            for (const k of keys) {
+                if (evaluations[k] && (evaluations[k].evaluations || evaluations[k].agents || evaluations[k].smart_dca)) {
+                    evaluations = evaluations[k].evaluations || evaluations[k].agents || evaluations[k];
+                    break;
+                }
+            }
+        }
+
+        if (!evaluations || typeof evaluations !== 'object') {
+            return;
+        }
 
         const agentMap = {
             'smart_dca': 'Smart DCA Agent',
@@ -1500,48 +1521,54 @@ async function fetchAndRenderAgentRadar() {
             'risk_governor': 'Risk & Portfolio Governor'
         };
 
-        // 1. Update the top-right 'SCANNING' status badge to 'ONLINE'
+        // Update top badge to ONLINE
         document.querySelectorAll('button, span, div, a').forEach(el => {
-            if (el.children.length === 0 && el.innerText && el.innerText.trim() === 'SCANNING') {
+            if (el.children.length === 0 && el.innerText && (el.innerText.trim() === 'SCANNING' || el.innerText.trim() === 'OFFLINE')) {
                 el.innerText = 'ONLINE';
                 el.style.color = '#10B981';
                 el.style.borderColor = '#10B981';
             }
         });
 
-        // 2. Scan all page elements to match Agent Titles dynamically
         const allElements = Array.from(document.querySelectorAll('*'));
 
         Object.keys(agentMap).forEach(agentKey => {
             const agentName = agentMap[agentKey];
             const agentData = evaluations[agentKey] || {};
 
-            const statusText = (agentData.signal || agentData.action || agentData.status || 'NEUTRAL').toUpperCase();
+            // 🎯 FIX: agentData.status or agentData.action come FIRST (since signal is a Number!)
+            const rawStatus = agentData.status || agentData.action || (typeof agentData.signal === 'number' ? (agentData.signal >= 75 ? 'BUY' : (agentData.signal <= 25 ? 'SELL' : 'HOLD')) : 'NEUTRAL');
+            const statusText = String(rawStatus).toUpperCase();
+            
+            // Extract Confidence safely
+            const rawVal = agentData.confidence ?? agentData.confidence_score ?? agentData.score ?? agentData.signal_strength ?? agentData.weight ?? 0;
             
             let confidence = 0;
-            if (typeof agentData.confidence === 'number') {
-                confidence = agentData.confidence;
-            } else if (typeof agentData.score === 'number') {
-                confidence = Math.round(agentData.score * 100);
-            } else if (typeof agentData.weight === 'number') {
-                confidence = Math.round(agentData.weight * 10);
+            if (typeof rawVal === 'number') {
+                confidence = (rawVal > 0 && rawVal <= 1) ? Math.round(rawVal * 100) : Math.round(rawVal);
+            } else if (typeof rawVal === 'string') {
+                const parsed = parseFloat(rawVal.replace('%', ''));
+                confidence = isNaN(parsed) ? 0 : ((parsed > 0 && parsed <= 1) ? Math.round(parsed * 100) : Math.round(parsed));
             }
 
-            // Match element containing exact Agent Name
+            // Fallback for active status if confidence is 0
+            if (confidence === 0 && (statusText === 'BUY' || statusText === 'SELL' || statusText === 'TRIGGERED' || statusText === 'ACTIVE')) {
+                confidence = 80;
+            }
+
+            // Update UI Card
             allElements.forEach(el => {
                 if (el.children.length === 0 && el.innerText && el.innerText.trim() === agentName) {
                     const cardContainer = el.closest('div');
                     if (cardContainer) {
-                        // Update text node containing 'undefined' or '0%'
                         const targetTextNodes = cardContainer.querySelectorAll('p, span, div, small');
                         targetTextNodes.forEach(node => {
-                            if (node.innerText && (node.innerText.includes('undefined') || node.innerText.includes('0%') || node.innerText.includes('HOLD') || node.innerText.includes('NEUTRAL') || node.innerText.includes('BUY') || node.innerText.includes('SELL'))) {
+                            if (node.innerText && (node.innerText.includes('undefined') || node.innerText.includes('0%') || node.innerText.includes('HOLD') || node.innerText.includes('NEUTRAL') || node.innerText.includes('BUY') || node.innerText.includes('SELL') || node.innerText.includes('TRIGGERED') || node.innerText.includes('SCANNING'))) {
                                 node.innerText = `${statusText} (${confidence}%)`;
-                                node.style.color = (statusText === 'BUY' || statusText === 'ACTIVE') ? '#10B981' : (statusText === 'SELL' ? '#EF4444' : '#9CA3AF');
+                                node.style.color = (statusText === 'BUY' || statusText === 'TRIGGERED' || statusText === 'ACTIVE') ? '#10B981' : (statusText === 'SELL' ? '#EF4444' : '#9CA3AF');
                             }
                         });
 
-                        // Update progress bar element
                         const progressBar = cardContainer.querySelector('div[style*="width"], .progress-bar');
                         if (progressBar) {
                             progressBar.style.width = `${Math.min(confidence, 100)}%`;
@@ -1558,7 +1585,6 @@ async function fetchAndRenderAgentRadar() {
     }
 }
 
-// Run immediately and loop every 10 seconds
 fetchAndRenderAgentRadar();
 setInterval(fetchAndRenderAgentRadar, 10000);
 </script>
