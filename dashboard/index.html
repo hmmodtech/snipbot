@@ -551,16 +551,57 @@ const REFRESH_MS = 15000;
       <div class="card">
         <div class="ch"><span class="ct">📡 Agent Radar</span>
           <span class="chip chip-amber" style="font-size:9px" id="agents-chip">SCANNING</span></div>
-        <div class="ag" id="agents-grid">
-          <div class="ac"><div class="an"><span>Smart DCA Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Smart DCA Agent')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
-          <div class="ac"><div class="an"><span>Technical Momentum Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Technical Momentum Agent')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
-          <div class="ac"><div class="an"><span>Trend Follower Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Trend Follower Agent')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
-          <div class="ac"><div class="an"><span>Grid Sniper Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Grid Sniper Agent')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
-          <div class="ac"><div class="an"><span>Liquidity Sweep Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Liquidity Sweep Agent')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
-          <div class="ac"><div class="an"><span>Micro-Scalper Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Micro-Scalper Agent')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
-          <div class="ac"><div class="an"><span>Sentiment AI Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Sentiment AI Agent')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
-          <div class="ac"><div class="an"><span>Risk & Portfolio Governor</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Risk & Portfolio Governor')">⚙️ CONFIG</button></div><div class="ar">SCANNING (0%)</div><div class="cb"><div class="cf" style="width:0%;background:var(--amber)"></div></div><div class="av">Awaiting engine...</div></div>
-        </div>
+        <!-- 🎯 ضع هذا الكود مكان <div class="ag" id="agents-grid"> الحالية -->
+<div class="ag" id="agents-grid">
+  <div class="ac" data-agent="smart_dca">
+    <div class="an"><span>Smart DCA Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Smart DCA Agent')">⚙️ CONFIG</button></div>
+    <div class="ar agent-status">SCANNING (0%)</div>
+    <div class="cb"><div class="cf progress-bar" style="width:0%;background:var(--amber)"></div></div>
+    <div class="av agent-reason">Awaiting engine...</div>
+  </div>
+  <div class="ac" data-agent="momentum_breakout">
+    <div class="an"><span>Technical Momentum Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Technical Momentum Agent')">⚙️ CONFIG</button></div>
+    <div class="ar agent-status">SCANNING (0%)</div>
+    <div class="cb"><div class="cf progress-bar" style="width:0%;background:var(--amber)"></div></div>
+    <div class="av agent-reason">Awaiting engine...</div>
+  </div>
+  <div class="ac" data-agent="trend_follower">
+    <div class="an"><span>Trend Follower Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Trend Follower Agent')">⚙️ CONFIG</button></div>
+    <div class="ar agent-status">SCANNING (0%)</div>
+    <div class="cb"><div class="cf progress-bar" style="width:0%;background:var(--amber)"></div></div>
+    <div class="av agent-reason">Awaiting engine...</div>
+  </div>
+  <div class="ac" data-agent="grid_sniper">
+    <div class="an"><span>Grid Sniper Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Grid Sniper Agent')">⚙️ CONFIG</button></div>
+    <div class="ar agent-status">SCANNING (0%)</div>
+    <div class="cb"><div class="cf progress-bar" style="width:0%;background:var(--amber)"></div></div>
+    <div class="av agent-reason">Awaiting engine...</div>
+  </div>
+  <div class="ac" data-agent="liquidity_sweep">
+    <div class="an"><span>Liquidity Sweep Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Liquidity Sweep Agent')">⚙️ CONFIG</button></div>
+    <div class="ar agent-status">SCANNING (0%)</div>
+    <div class="cb"><div class="cf progress-bar" style="width:0%;background:var(--amber)"></div></div>
+    <div class="av agent-reason">Awaiting engine...</div>
+  </div>
+  <div class="ac" data-agent="micro_scalper">
+    <div class="an"><span>Micro-Scalper Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Micro-Scalper Agent')">⚙️ CONFIG</button></div>
+    <div class="ar agent-status">SCANNING (0%)</div>
+    <div class="cb"><div class="cf progress-bar" style="width:0%;background:var(--amber)"></div></div>
+    <div class="av agent-reason">Awaiting engine...</div>
+  </div>
+  <div class="ac" data-agent="sentiment_ai">
+    <div class="an"><span>Sentiment AI Agent</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Sentiment AI Agent')">⚙️ CONFIG</button></div>
+    <div class="ar agent-status">SCANNING (0%)</div>
+    <div class="cb"><div class="cf progress-bar" style="width:0%;background:var(--amber)"></div></div>
+    <div class="av agent-reason">Awaiting engine...</div>
+  </div>
+  <div class="ac" data-agent="risk_governor">
+    <div class="an"><span>Risk & Portfolio Governor</span><button class="btn btn-ghost" style="padding:1px 4px;font-size:8px" onclick="openAgentConfig('Risk & Portfolio Governor')">⚙️ CONFIG</button></div>
+    <div class="ar agent-status">SCANNING (0%)</div>
+    <div class="cb"><div class="cf progress-bar" style="width:0%;background:var(--amber)"></div></div>
+    <div class="av agent-reason">Awaiting engine...</div>
+  </div>
+</div>
       </div>
     </div>
 
@@ -1395,26 +1436,17 @@ window.addEventListener('resize', () => {
 });
 
 // 🎯 SnipBot Unified Agent Radar Scanner
+// 🎯 ضع هذا السكريبت في أسفل index.html داخل وسم <script>
 async function fetchAndRenderAgentRadar(targetPair) {
     try {
-        const pairs = getChartPairs();
-        const currentPair = targetPair || pairs[chartPairIndex] || 'BTC/USDT';
+        const currentPair = targetPair || (typeof getChartPairs === 'function' ? getChartPairs()[chartPairIndex] : 'BTC/USDT');
         
-        let response;
-        try {
-            response = await fetch(`https://agents-snipbot.up.railway.app/api/agents/evaluate?pair=${encodeURIComponent(currentPair)}`);
-        } catch(e) {
-            response = await fetch(`https://snipbot-proxy.up.railway.app/api/agents/evaluate?pair=${encodeURIComponent(currentPair)}`);
+        let response = await fetch(`${PROXY_URL}/api/agents/evaluate?pair=${encodeURIComponent(currentPair)}`);
+        if (!response.ok) {
+            response = await fetch(`${AGENTS_URL}/api/agents/evaluate?pair=${encodeURIComponent(currentPair)}`);
         }
 
-        if (!response.ok) {
-            response = await fetch(`https://snipbot-proxy.up.railway.app/api/agents/evaluate?pair=${encodeURIComponent(currentPair)}`);
-        }
-
-        if (!response.ok) {
-            console.warn(`⚠️ [SnipBot]: Backend returned HTTP ${response.status}`);
-            return;
-        }
+        if (!response.ok) return;
 
         const jsonPayload = await response.json();
         let evaluations = jsonPayload.evaluations || jsonPayload.agents || jsonPayload.data || jsonPayload;
@@ -1422,98 +1454,65 @@ async function fetchAndRenderAgentRadar(targetPair) {
         if (evaluations && !evaluations.smart_dca && typeof evaluations === 'object') {
             const keys = Object.keys(evaluations);
             for (const k of keys) {
-                if (evaluations[k] && (evaluations[k].evaluations || evaluations[k].agents || evaluations[k].smart_dca)) {
-                    evaluations = evaluations[k].evaluations || evaluations[k].agents || evaluations[k];
+                if (evaluations[k] && (evaluations[k].evaluations || evaluations[k].smart_dca)) {
+                    evaluations = evaluations[k].evaluations || evaluations[k];
                     break;
                 }
             }
         }
 
-        if (!evaluations || typeof evaluations !== 'object') {
-            return;
-        }
+        if (!evaluations || typeof evaluations !== 'object') return;
 
-        const agentMap = {
-            'smart_dca': 'Smart DCA Agent',
-            'momentum_breakout': 'Technical Momentum Agent',
-            'trend_follower': 'Trend Follower Agent',
-            'grid_sniper': 'Grid Sniper Agent',
-            'liquidity_sweep': 'Liquidity Sweep Agent',
-            'micro_scalper': 'Micro-Scalper Agent',
-            'sentiment_ai': 'Sentiment AI Agent',
-            'risk_governor': 'Risk & Portfolio Governor'
-        };
-
-        // Update Badge to ONLINE
+        // Update ONLINE status chip
         const chip = document.getElementById('agents-chip');
         if (chip) {
             chip.innerText = 'ONLINE';
             chip.className = 'chip chip-neon';
         }
 
-        const leafElements = Array.from(document.querySelectorAll('*')).filter(el => el.children.length === 0);
-
-        leafElements.forEach(el => {
-            const txt = el.innerText ? el.innerText.trim() : '';
+        // Targeted O(1) Fast Selector
+        Object.keys(evaluations).forEach(agentKey => {
+            const agentData = evaluations[agentKey] || {};
+            const cardEl = document.querySelector(`[data-agent="${agentKey}"]`);
             
-            if (txt.includes('undefined') || txt.includes('0%') || txt.includes('SCANNING') || txt.includes('HOLD') || txt.includes('NEUTRAL') || txt.includes('BUY') || txt.includes('SELL') || txt.includes('TRIGGERED')) {
-                const cardContainer = el.closest('.ac') || el.closest('div');
-                if (cardContainer) {
-                    const containerText = cardContainer.innerText || '';
-                    
-                    Object.keys(agentMap).forEach(agentKey => {
-                        const agentName = agentMap[agentKey];
-                        if (containerText.includes(agentName)) {
-                            const agentData = evaluations[agentKey] || {};
+            if (cardEl) {
+                const statusEl = cardEl.querySelector('.agent-status');
+                const reasonEl = cardEl.querySelector('.agent-reason');
+                const progressBar = cardEl.querySelector('.progress-bar');
 
-                            const rawStatus = agentData.status || agentData.action || (typeof agentData.signal === 'number' ? (agentData.signal >= 75 ? 'BUY' : (agentData.signal <= 25 ? 'SELL' : 'HOLD')) : 'NEUTRAL');
-                            const statusText = String(rawStatus).toUpperCase();
+                const rawStatus = agentData.status || agentData.action || (typeof agentData.signal === 'number' ? (agentData.signal >= 75 ? 'BUY' : (agentData.signal <= 25 ? 'SELL' : 'HOLD')) : 'NEUTRAL');
+                const statusText = String(rawStatus).toUpperCase();
 
-                            const rawVal = agentData.confidence ?? agentData.confidence_score ?? agentData.score ?? agentData.signal_strength ?? agentData.weight ?? 0;
-                            let confidence = 0;
-                            if (typeof rawVal === 'number') {
-                                confidence = (rawVal > 0 && rawVal <= 1) ? Math.round(rawVal * 100) : Math.round(rawVal);
-                            } else if (typeof rawVal === 'string') {
-                                const parsed = parseFloat(rawVal.replace('%', ''));
-                                confidence = isNaN(parsed) ? 0 : ((parsed > 0 && parsed <= 1) ? Math.round(parsed * 100) : Math.round(parsed));
-                            }
+                const rawVal = agentData.confidence ?? agentData.confidence_score ?? agentData.score ?? agentData.weight ?? 0;
+                let confidence = 0;
+                if (typeof rawVal === 'number') {
+                    confidence = (rawVal > 0 && rawVal <= 1) ? Math.round(rawVal * 100) : Math.round(rawVal);
+                }
 
-                            if (confidence === 0 && (statusText === 'BUY' || statusText === 'SELL' || statusText === 'TRIGGERED' || statusText === 'ACTIVE' || statusText === 'SCANNING')) {
-                                confidence = 80;
-                            }
+                if (confidence === 0 && (statusText === 'BUY' || statusText === 'TRIGGERED' || statusText === 'ACTIVE')) {
+                    confidence = 80;
+                }
 
-                            el.innerText = `${statusText} (${confidence}%)`;
-                            el.style.color = (statusText === 'BUY' || statusText === 'TRIGGERED' || statusText === 'ACTIVE') ? '#10B981' : (statusText === 'SELL' ? '#EF4444' : '#9CA3AF');
+                if (statusEl) {
+                    statusEl.innerText = `${statusText} (${confidence}%)`;
+                    statusEl.style.color = (statusText === 'BUY' || statusText === 'TRIGGERED' || statusText === 'ACTIVE') ? '#10B981' : (statusText === 'SELL' ? '#EF4444' : '#9CA3AF');
+                }
 
-                            // Update Reason if available
-                            const reasonNode = cardContainer.querySelector('.av');
-                            if (reasonNode && agentData.reason) {
-                                reasonNode.innerText = agentData.reason;
-                            }
+                if (reasonEl && agentData.reason) {
+                    reasonEl.innerText = agentData.reason;
+                }
 
-                            // Update progress bar
-                            const progressBar = cardContainer.querySelector('.cf, .progress-bar, div[style*="width"]');
-                            if (progressBar) {
-                                progressBar.style.width = `${Math.min(confidence, 100)}%`;
-                                progressBar.style.background = (statusText === 'BUY' || statusText === 'TRIGGERED' || statusText === 'ACTIVE') ? 'var(--neon)' : (statusText === 'SELL' ? 'var(--danger)' : 'var(--amber)');
-                            }
-                        }
-                    });
+                if (progressBar) {
+                    progressBar.style.width = `${Math.min(confidence, 100)}%`;
+                    progressBar.style.background = (statusText === 'BUY' || statusText === 'TRIGGERED' || statusText === 'ACTIVE') ? 'var(--neon)' : (statusText === 'SELL' ? 'var(--danger)' : 'var(--amber)');
                 }
             }
         });
 
-        console.log(`✅ [SnipBot]: Agent Radar UI updated successfully for ${currentPair}!`);
-
     } catch (error) {
-        console.error('❌ [SnipBot UI Error]: Radar update error:', error);
+        console.error('❌ [SnipBot Targeted Renderer Error]:', error);
     }
 }
-
-// INITIALIZATION
-refreshAll();
-setInterval(refreshAll, REFRESH_MS);
-setInterval(addSnippet, 25000);
 </script>
 </body>
 </html>
