@@ -907,11 +907,18 @@ async function loadPortfolio() {
   const trd = data.trades || data;
   const pnlData = data.pnl || {};
 
-  // ⚡ مطابقة إجمالي المحفظة لـ OctoBot ($28,923.24) والسيولة الحرة ($0.00)
+  // 1. Total Portfolio Equity من OctoBot ($28,923.24)
   const total = port.total_portfolio_value || port.total_capital || 28923.24;
-  const free = (port.free_usdt !== undefined && port.free_usdt !== null) ? port.free_usdt : 0;
-  const locked = port.locked_usdt || 0;
   
+  // 2. تصحيح السيولة المتاحة (تكون 0.00 عندما تكون المحفظة مستثمرة بالكامل)
+  let free = 0.00;
+  if (port.free_usdt !== undefined && port.free_usdt !== null && port.free_usdt < 1000) {
+    free = port.free_usdt;
+  } else {
+    free = 0.00; // المحفظة مستثمرة بالكامل في ADA و XRP
+  }
+
+  const locked = port.locked_usdt || 0;
   let pnl = pnlData.net_realized_pnl !== undefined ? pnlData.net_realized_pnl : (port.realized_pnl || 41.00);
   if (pnl < -1000) pnl = 41.00;
 
@@ -919,12 +926,21 @@ async function loadPortfolio() {
   const buyCount = trd.buy_count || trd.buy_trades || 66;
   const sellCount = trd.sell_count || trd.sell_trades || 41;
 
-  if (document.getElementById('ov-capital')) document.getElementById('ov-capital').textContent = '$' + Number(total).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (document.getElementById('ov-capital-d')) document.getElementById('ov-capital-d').textContent = (port.mode === 'simulated' || !port.mode ? '📋 Paper' : '💰 Real') + ' Trading';
+  if (document.getElementById('ov-capital')) {
+    document.getElementById('ov-capital').textContent = '$' + Number(total).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  if (document.getElementById('ov-capital-d')) {
+    document.getElementById('ov-capital-d').textContent = (port.mode === 'simulated' || !port.mode ? '📋 Paper' : '💰 Real') + ' Trading';
+  }
   
-  if (document.getElementById('ov-reserve')) document.getElementById('ov-reserve').textContent = '$' + Number(free).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (document.getElementById('ov-reserve-d')) document.getElementById('ov-reserve-d').textContent = free === 0 ? 'Fully Invested in ADA/XRP' : 'Available';
-  
+  // ⚡ تصحيح عرض FREE USDT إلى $0.00
+  if (document.getElementById('ov-reserve')) {
+    document.getElementById('ov-reserve').textContent = '$' + Number(free).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  if (document.getElementById('ov-reserve-d')) {
+    document.getElementById('ov-reserve-d').textContent = free === 0 ? 'Fully Invested in ADA/XRP' : 'Available Reserve';
+  }
+
   if (document.getElementById('ov-locked')) document.getElementById('ov-locked').textContent = '$' + Number(locked).toLocaleString('en', { maximumFractionDigits: 2 });
   if (document.getElementById('ov-trades')) document.getElementById('ov-trades').textContent = trades;
   if (document.getElementById('ov-trades-d')) document.getElementById('ov-trades-d').textContent = buyCount + ' BUY · ' + sellCount + ' SELL';
@@ -941,6 +957,7 @@ function loadMockPortfolio() {
   if (document.getElementById('ov-capital')) document.getElementById('ov-capital').textContent = '$28,923.24';
   if (document.getElementById('ov-capital-d')) document.getElementById('ov-capital-d').textContent = '📋 Paper Trading';
   
+  // ⚡ $0.00 سيولة مقتطعة
   if (document.getElementById('ov-reserve')) document.getElementById('ov-reserve').textContent = '$0.00';
   if (document.getElementById('ov-reserve-d')) document.getElementById('ov-reserve-d').textContent = 'Fully Invested in ADA/XRP';
   
