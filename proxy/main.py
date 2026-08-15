@@ -387,6 +387,60 @@ def exchange_balance():
     except Exception as e:
         return jsonify({"status":"error","error":str(e)[:200]}), 500
 
+@app.route("/api/agents/evaluate")
+def agents_evaluate():
+    """
+    يمرر طلب التحليل للـ Agents service
+    ويرجع النتيجة للـ Dashboard
+    """
+    pair = request.args.get("pair", "BTC/USDT")
+    
+    AGENTS_URL = os.getenv(
+        "AGENTS_URL",
+        "https://agents-snipbot.up.railway.app"
+    )
+
+    try:
+        # يحاول يجيب من الـ Agents مباشرة
+        r = requests.get(
+            f"{AGENTS_URL}/api/agents/evaluate",
+            params={"pair": pair},
+            timeout=15
+        )
+        if r.status_code == 200:
+            data = r.json()
+            data["source"] = "live"
+            data["pair"]   = pair
+            return jsonify(data)
+
+    except Exception as e:
+        log.warning(f"[Proxy] Agents service unreachable: {e}")
+
+    # Fallback — يجيب من الـ store المحفوظ
+    signals = _agents_store.get("signals", [])
+    pair_signals = [
+        s for s in signals
+        if s.get("pair") == pair or s.get("symbol") == pair
+    ]
+
+    if pair_signals:
+        latest = pair_signals[-1]
+        return jsonify({
+            "source":     "cached",
+            "pair":       pair,
+            "action":     latest.get("action", "HOLD"),
+            "confidence": latest.get("confidence", 0),
+            "reason":     latest.get("reason", "—"),
+        })
+
+    # لو ما في بيانات خالص
+    return jsonify({
+        "source":     "waiting",
+        "pair":       pair,
+        "action":     "SCANNING",
+        "confidence": 0,
+        "reason":     f"No analysis yet for {pair}"
+    })
 
 if __name__ == "__main__":
     log.info(f"[SnipBot Proxy v5]: Starting on port {PORT}")
