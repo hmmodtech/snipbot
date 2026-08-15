@@ -413,6 +413,37 @@ def agents_evaluate():
         "confidence": 0,
         "reason":     f"No analysis yet for {pair}"
     })
+@app.route("/api/ai_analysis")
+def ai_analysis():
+    symbol = request.args.get("symbol", "BTC/USDT")
+    try:
+        r = requests.get(
+            f"{AGENTS_SERVICE_URL}/api/agents/evaluate",
+            params={"pair": symbol},
+            timeout=10
+        )
+        if r.status_code == 200:
+            data = r.json()
+            return jsonify({
+                "source":     "live",
+                "symbol":     symbol,
+                "signal":     data.get("action",     "HOLD"),
+                "confidence": data.get("confidence", 0),
+                "reason":     data.get("reason",     "—"),
+                "summary":    f"{symbol} — {data.get('action','HOLD')} @ {data.get('confidence',0):.0f}%",
+                "agents":     data.get("agents", [])
+            })
+    except Exception as e:
+        log.warning(f"[Proxy] ai_analysis: {e}")
+
+    return jsonify({
+        "source":     "waiting",
+        "symbol":     symbol,
+        "signal":     "SCANNING",
+        "confidence": 0,
+        "summary":    f"Scanning {symbol}...",
+        "agents":     []
+    })
 
 if __name__ == "__main__":
     log.info(f"[SnipBot Proxy v5]: Starting on port {PORT}")
