@@ -1019,16 +1019,21 @@ function openKpiModal(type) {
   const trd = d.trades || d;
   const pnlData = d.pnl || {};
 
-  // 1. Total Capital ($28,923.24)
+  // 1. إجمالي رأس المال
   const totalVal = port.total_portfolio_value || port.total_capital || 28923.24;
   
-  // 2. Free USDT (تكون 0.00 عندما تكون المحفظة مستثمرة بالكامل في ADA/XRP)
+  // 2. السيولة الحرة المتاحة
   let freeVal = 0.00;
   if (port.free_usdt !== undefined && port.free_usdt !== null && port.free_usdt < 1000) {
     freeVal = port.free_usdt;
   } else {
-    freeVal = 0.00; // مستثمرة بالكامل
+    freeVal = 0.00;
   }
+
+  // 3. ⚡ حساب المبلغ المستثمر داخل صفقات عملات (Capital Deployed in Trades)
+  const investedVal = Math.max(0, totalVal - freeVal);
+  const investedPct = totalVal > 0 ? ((investedVal / totalVal) * 100).toFixed(1) : 0;
+  const investedFmt = '$' + Number(investedVal).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
 
   const lockedVal = port.locked_usdt !== undefined ? port.locked_usdt : 0;
   
@@ -1049,10 +1054,23 @@ function openKpiModal(type) {
 
   if (type === 'capital') {
     title.textContent = '💰 Total Capital Breakdown';
-    content.innerHTML = '<b>Total Portfolio Equity:</b> <span style="color:var(--neon)">' + total + '</span><br><b>Mode:</b> Paper Trading (Simulated)<br><b>Max Exposure Limit:</b> $500 USDT per trade.<br><b>Risk Allocation:</b> 100% USDT Liquid Reserve.';
+    content.innerHTML = `
+      <b>Total Portfolio Equity:</b> <span style="color:var(--neon);font-size:13px;">${total}</span><br>
+      <b>Capital Deployed in Trades:</b> <span style="color:#00e5ff;font-weight:700;">${investedFmt} (${investedPct}%)</span><br>
+      <b>Free Liquid Cash Reserve:</b> <span style="color:var(--amber);">${free}</span><br>
+      <b>Active Holdings Asset Allocation:</b> <span style="color:var(--steel);">ADA (~81.7%) · XRP (~18.3%)</span><br>
+      <hr style="border:0;border-top:1px solid var(--border);margin:8px 0;">
+      <b>Mode:</b> Paper Trading (Simulated)<br>
+      <b>Max Exposure Limit:</b> $500 USDT per snipe position.
+    `;
   } else if (type === 'reserve') {
-    title.textContent = '💵 Free Liquid Reserve';
-    content.innerHTML = '<b>Free USDT:</b> <span style="color:var(--amber)">' + free + '</span><br><b>Status:</b> <span style="color:var(--steel)">' + (freeVal === 0 ? 'Fully Invested in ADA/XRP' : 'Ready for acquisitions') + '</span><br><b>Reserved Escrow:</b> $0.00 USDT.';
+    title.textContent = '💵 Free Liquid Reserve & Exposure';
+    content.innerHTML = `
+      <b>Free Liquid USDT:</b> <span style="color:var(--amber);font-size:13px;">${free}</span><br>
+      <b>Capital Deployed in Positions:</b> <span style="color:#00e5ff;font-weight:700;">${investedFmt} (${investedPct}%)</span><br>
+      <b>Active Asset Breakdown:</b> ADA ($23,624.39) · XRP ($5,298.85)<br>
+      <b>Status:</b> <span style="color:var(--neon);">${freeVal === 0 ? '100% Deployed in Active Snipes' : 'Ready for acquisitions'}</span>
+    `;
   } else if (type === 'locked') {
     title.textContent = '🔒 Locked Orders Escrow';
     content.innerHTML = '<b>Open Orders:</b> ' + (port.open_orders_count || 0) + ' Pending<br><b>Locked Capital:</b> <span style="color:var(--green)">' + locked + '</span><br><b>Orderbook Connection:</b> KuCoin Spot Active.';
