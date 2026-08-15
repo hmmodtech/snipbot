@@ -110,7 +110,7 @@ def portfolio():
             for o in orders_list
         ), 2)
 
-        BASE_CAPITAL = 10000.0
+        BASE_CAPITAL = 30000.0
         free_usdt = round(max(BASE_CAPITAL - locked, 0), 2)
 
         return jsonify({
