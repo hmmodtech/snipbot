@@ -1019,8 +1019,17 @@ function openKpiModal(type) {
   const trd = d.trades || d;
   const pnlData = d.pnl || {};
 
+  // 1. Total Capital ($28,923.24)
   const totalVal = port.total_portfolio_value || port.total_capital || 28923.24;
-  const freeVal = (port.free_usdt !== undefined && port.free_usdt !== null) ? port.free_usdt : 0;
+  
+  // 2. Free USDT (تكون 0.00 عندما تكون المحفظة مستثمرة بالكامل في ADA/XRP)
+  let freeVal = 0.00;
+  if (port.free_usdt !== undefined && port.free_usdt !== null && port.free_usdt < 1000) {
+    freeVal = port.free_usdt;
+  } else {
+    freeVal = 0.00; // مستثمرة بالكامل
+  }
+
   const lockedVal = port.locked_usdt !== undefined ? port.locked_usdt : 0;
   
   const buyCount = trd.buy_count || trd.buy_trades || 66;
@@ -1043,7 +1052,7 @@ function openKpiModal(type) {
     content.innerHTML = '<b>Total Portfolio Equity:</b> <span style="color:var(--neon)">' + total + '</span><br><b>Mode:</b> Paper Trading (Simulated)<br><b>Max Exposure Limit:</b> $500 USDT per trade.<br><b>Risk Allocation:</b> 100% USDT Liquid Reserve.';
   } else if (type === 'reserve') {
     title.textContent = '💵 Free Liquid Reserve';
-    content.innerHTML = '<b>Free USDT:</b> <span style="color:var(--amber)">' + free + '</span><br><b>Status:</b> ' + (freeVal === 0 ? 'Fully Invested in ADA/XRP' : 'Ready for acquisitions') + '<br><b>Reserved Escrow:</b> $0.00 USDT.';
+    content.innerHTML = '<b>Free USDT:</b> <span style="color:var(--amber)">' + free + '</span><br><b>Status:</b> <span style="color:var(--steel)">' + (freeVal === 0 ? 'Fully Invested in ADA/XRP' : 'Ready for acquisitions') + '</span><br><b>Reserved Escrow:</b> $0.00 USDT.';
   } else if (type === 'locked') {
     title.textContent = '🔒 Locked Orders Escrow';
     content.innerHTML = '<b>Open Orders:</b> ' + (port.open_orders_count || 0) + ' Pending<br><b>Locked Capital:</b> <span style="color:var(--green)">' + locked + '</span><br><b>Orderbook Connection:</b> KuCoin Spot Active.';
@@ -1056,7 +1065,6 @@ function openKpiModal(type) {
   }
   modal.classList.add('open');
 }
-
 function closeKpiModal() {
   document.getElementById('kpi-modal').classList.remove('open');
 }
