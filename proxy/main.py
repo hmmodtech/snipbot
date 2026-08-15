@@ -395,10 +395,7 @@ def agents_evaluate():
     """
     pair = request.args.get("pair", "BTC/USDT")
     
-    AGENTS_URL = os.getenv(
-        "AGENTS_URL",
-        "https://agents-snipbot.up.railway.app"
-    )
+    AGENTS_URL = os.getenv("AGENTS_SERVICE_URL", "https://agents-snipbot.up.railway.app")
 
     try:
         # يحاول يجيب من الـ Agents مباشرة
