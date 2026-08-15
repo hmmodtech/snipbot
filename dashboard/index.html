@@ -814,9 +814,9 @@ let selectedAgentName = '';
 
 setInterval(() => {
   const n = new Date();
-  document.getElementById('topbar-clock').textContent = n.toLocaleTimeString('en-GB');
+  if (document.getElementById('topbar-clock')) document.getElementById('topbar-clock').textContent = n.toLocaleTimeString('en-GB');
   upSec++;
-  document.getElementById('uptime-chip').textContent = 'UP: ' + String(Math.floor(upSec / 3600)).padStart(2, '0') + ':' + String(Math.floor((upSec % 3600) / 60)).padStart(2, '0');
+  if (document.getElementById('uptime-chip')) document.getElementById('uptime-chip').textContent = 'UP: ' + String(Math.floor(upSec / 3600)).padStart(2, '0') + ':' + String(Math.floor((upSec % 3600) / 60)).padStart(2, '0');
 }, 1000);
 
 function showToast(msg, type = 'neon') {
@@ -828,8 +828,10 @@ function showToast(msg, type = 'neon') {
 }
 
 function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('open');
-  document.getElementById('sidebar-overlay').classList.toggle('open');
+  const sb = document.getElementById('sidebar');
+  const sbo = document.getElementById('sidebar-overlay');
+  if (sb) sb.classList.toggle('open');
+  if (sbo) sbo.classList.toggle('open');
 }
 
 const PAGES = ['board', 'exchanges', 'pairs', 'trading', 'agents', 'history', 'telegram', 'settings'];
@@ -852,8 +854,8 @@ function setPage(p, el) {
   document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
   if (el) el.classList.add('active');
   if (PAGE_TITLES[p]) {
-    document.getElementById('page-title').textContent = PAGE_TITLES[p][0];
-    document.getElementById('page-sub').textContent = PAGE_TITLES[p][1];
+    if (document.getElementById('page-title')) document.getElementById('page-title').textContent = PAGE_TITLES[p][0];
+    if (document.getElementById('page-sub')) document.getElementById('page-sub').textContent = PAGE_TITLES[p][1];
   }
   if (window.innerWidth <= 768) toggleSidebar();
   if (p === 'exchanges') loadExchanges();
@@ -905,8 +907,9 @@ async function loadPortfolio() {
   const trd = data.trades || data;
   const pnlData = data.pnl || {};
 
-  const total = port.total_capital || port.total_portfolio_value || 30000;
-  const free = port.free_usdt || 10000;
+  // ⚡ مطابقة إجمالي المحفظة لـ OctoBot ($28,923.24) والسيولة الحرة ($0.00)
+  const total = port.total_portfolio_value || port.total_capital || 28923.24;
+  const free = (port.free_usdt !== undefined && port.free_usdt !== null) ? port.free_usdt : 0;
   const locked = port.locked_usdt || 0;
   
   let pnl = pnlData.net_realized_pnl !== undefined ? pnlData.net_realized_pnl : (port.realized_pnl || 41.00);
@@ -916,12 +919,13 @@ async function loadPortfolio() {
   const buyCount = trd.buy_count || trd.buy_trades || 66;
   const sellCount = trd.sell_count || trd.sell_trades || 41;
 
-  if (document.getElementById('ov-capital')) document.getElementById('ov-capital').textContent = '$' + Number(total).toLocaleString('en', { maximumFractionDigits: 2 });
+  if (document.getElementById('ov-capital')) document.getElementById('ov-capital').textContent = '$' + Number(total).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (document.getElementById('ov-capital-d')) document.getElementById('ov-capital-d').textContent = (port.mode === 'simulated' || !port.mode ? '📋 Paper' : '💰 Real') + ' Trading';
-  if (document.getElementById('ov-reserve')) document.getElementById('ov-reserve').textContent = '$' + Number(free).toLocaleString('en', { maximumFractionDigits: 2 });
-  if (document.getElementById('ov-reserve-d')) document.getElementById('ov-reserve-d').textContent = 'Available';
+  
+  if (document.getElementById('ov-reserve')) document.getElementById('ov-reserve').textContent = '$' + Number(free).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (document.getElementById('ov-reserve-d')) document.getElementById('ov-reserve-d').textContent = free === 0 ? 'Fully Invested in ADA/XRP' : 'Available';
+  
   if (document.getElementById('ov-locked')) document.getElementById('ov-locked').textContent = '$' + Number(locked).toLocaleString('en', { maximumFractionDigits: 2 });
-  if (document.getElementById('ov-locked-d')) document.getElementById('ov-locked-d').textContent = 'In open orders';
   if (document.getElementById('ov-trades')) document.getElementById('ov-trades').textContent = trades;
   if (document.getElementById('ov-trades-d')) document.getElementById('ov-trades-d').textContent = buyCount + ' BUY · ' + sellCount + ' SELL';
   
@@ -934,11 +938,23 @@ async function loadPortfolio() {
 }
 
 function loadMockPortfolio() {
-  if (document.getElementById('ov-capital')) document.getElementById('ov-capital').textContent = '$30,000';
-  if (document.getElementById('ov-reserve')) document.getElementById('ov-reserve').textContent = '$10,000';
+  if (document.getElementById('ov-capital')) document.getElementById('ov-capital').textContent = '$28,923.24';
+  if (document.getElementById('ov-capital-d')) document.getElementById('ov-capital-d').textContent = '📋 Paper Trading';
+  
+  if (document.getElementById('ov-reserve')) document.getElementById('ov-reserve').textContent = '$0.00';
+  if (document.getElementById('ov-reserve-d')) document.getElementById('ov-reserve-d').textContent = 'Fully Invested in ADA/XRP';
+  
   if (document.getElementById('ov-locked')) document.getElementById('ov-locked').textContent = '$0';
+  if (document.getElementById('ov-locked-d')) document.getElementById('ov-locked-d').textContent = 'In open orders';
+  
   if (document.getElementById('ov-trades')) document.getElementById('ov-trades').textContent = '107';
-  if (document.getElementById('ov-pnl')) document.getElementById('ov-pnl').textContent = '+$41.00';
+  if (document.getElementById('ov-trades-d')) document.getElementById('ov-trades-d').textContent = '66 BUY · 41 SELL';
+  
+  if (document.getElementById('ov-pnl')) {
+    document.getElementById('ov-pnl').textContent = '+$41.00';
+    document.getElementById('ov-pnl').className = 'ovv up';
+  }
+  if (document.getElementById('ov-pnl-d')) document.getElementById('ov-pnl-d').textContent = '↑ Profit';
 }
 
 async function loadTrades() {
@@ -986,8 +1002,8 @@ function openKpiModal(type) {
   const trd = d.trades || d;
   const pnlData = d.pnl || {};
 
-  const totalVal = port.total_capital || port.total_portfolio_value || 30000;
-  const freeVal = port.free_usdt || 10000;
+  const totalVal = port.total_portfolio_value || port.total_capital || 28923.24;
+  const freeVal = (port.free_usdt !== undefined && port.free_usdt !== null) ? port.free_usdt : 0;
   const lockedVal = port.locked_usdt !== undefined ? port.locked_usdt : 0;
   
   const buyCount = trd.buy_count || trd.buy_trades || 66;
@@ -1010,7 +1026,7 @@ function openKpiModal(type) {
     content.innerHTML = '<b>Total Portfolio Equity:</b> <span style="color:var(--neon)">' + total + '</span><br><b>Mode:</b> Paper Trading (Simulated)<br><b>Max Exposure Limit:</b> $500 USDT per trade.<br><b>Risk Allocation:</b> 100% USDT Liquid Reserve.';
   } else if (type === 'reserve') {
     title.textContent = '💵 Free Liquid Reserve';
-    content.innerHTML = '<b>Free USDT:</b> <span style="color:var(--amber)">' + free + '</span><br><b>Status:</b> Ready for acquisitions<br><b>Reserved Escrow:</b> $0.00 USDT.';
+    content.innerHTML = '<b>Free USDT:</b> <span style="color:var(--amber)">' + free + '</span><br><b>Status:</b> ' + (freeVal === 0 ? 'Fully Invested in ADA/XRP' : 'Ready for acquisitions') + '<br><b>Reserved Escrow:</b> $0.00 USDT.';
   } else if (type === 'locked') {
     title.textContent = '🔒 Locked Orders Escrow';
     content.innerHTML = '<b>Open Orders:</b> ' + (port.open_orders_count || 0) + ' Pending<br><b>Locked Capital:</b> <span style="color:var(--green)">' + locked + '</span><br><b>Orderbook Connection:</b> KuCoin Spot Active.';
@@ -1115,7 +1131,7 @@ function updateChartHeader(candles) {
   if (prEl) prEl.textContent = '$' + (last.c < 1 ? last.c.toFixed(4) : last.c.toFixed(2));
   if (chEl) {
     chEl.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
-    chEl.className = 'chart-pair-change ' + (chg >= 0 ? 'up' : 'dn');
+    chg >= 0 ? chEl.className = 'chart-pair-change up' : chEl.className = 'chart-pair-change dn';
   }
 }
 
@@ -1257,7 +1273,6 @@ function renderAiData(data) {
   `;
 }
 
-// 🎯 Agent Radar Scanner
 async function fetchAndRenderAgentRadar(targetPair) {
   const chip = document.getElementById('agents-chip');
   if (chip) { chip.innerText = 'ONLINE'; chip.className = 'chip chip-neon'; }
@@ -1313,7 +1328,6 @@ function renderRadarData(json) {
   renderRadarFallback();
 }
 
-// ⚡ الاستدعاء المستقل يضمن عدم تعليق أي قسم
 async function refreshAll() {
   try { await loadPortfolio(); } catch(e){}
   try { await loadTrades(); } catch(e){}
@@ -1325,15 +1339,8 @@ async function refreshAll() {
 
 window.addEventListener('resize', () => { drawCandlestick(); });
 
-// التشغيل الفوري عند التحميل
 refreshAll();
 setInterval(refreshAll, REFRESH_MS);
-</script>
-
-// INITIALIZATION
-refreshAll();
-setInterval(refreshAll, REFRESH_MS);
-setInterval(addSnippet, 25000);
 </script>
 </body>
 </html>
