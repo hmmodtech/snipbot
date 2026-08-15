@@ -254,24 +254,6 @@ def agents_status():
         "signals":   _agents_store.get("signals", [])
     })
 
-
-@app.route("/api/agents/evaluate")
-def agents_evaluate():
-    pair = request.args.get("pair", "BTC/USDT")
-    tf   = request.args.get("timeframe", "1h")
-    try:
-        r = requests.get(
-            f"{AGENTS_SERVICE_URL}/api/agents/evaluate",
-            params={"pair": pair, "timeframe": tf},
-            timeout=10
-        )
-        if r.status_code == 200:
-            return jsonify(r.json())
-    except Exception as e:
-        log.warning(f"[Proxy] agents/evaluate fallback: {e}")
-    return jsonify({"status": "error", "error": "Agents service unavailable"}), 503
-
-
 @app.route("/status")
 def status():
     return jsonify({
@@ -389,48 +371,41 @@ def exchange_balance():
 
 @app.route("/api/agents/evaluate")
 def agents_evaluate():
-    """
-    يمرر طلب التحليل للـ Agents service
-    ويرجع النتيجة للـ Dashboard
-    """
     pair = request.args.get("pair", "BTC/USDT")
-    
-    AGENTS_URL = os.getenv("AGENTS_SERVICE_URL", "https://agents-snipbot.up.railway.app")
+    tf   = request.args.get("timeframe", "1h")
 
+    # محاولة 1 — Agents service مباشرة
     try:
-        # يحاول يجيب من الـ Agents مباشرة
         r = requests.get(
-            f"{AGENTS_URL}/api/agents/evaluate",
-            params={"pair": pair},
-            timeout=15
+            f"{AGENTS_SERVICE_URL}/api/agents/evaluate",
+            params={"pair": pair, "timeframe": tf},
+            timeout=10
         )
         if r.status_code == 200:
             data = r.json()
             data["source"] = "live"
             data["pair"]   = pair
             return jsonify(data)
-
     except Exception as e:
-        log.warning(f"[Proxy] Agents service unreachable: {e}")
+        log.warning(f"[Proxy] agents/evaluate: {e}")
 
-    # Fallback — يجيب من الـ store المحفوظ
+    # محاولة 2 — من الـ store المحفوظ
     signals = _agents_store.get("signals", [])
     pair_signals = [
         s for s in signals
         if s.get("pair") == pair or s.get("symbol") == pair
     ]
-
     if pair_signals:
         latest = pair_signals[-1]
         return jsonify({
             "source":     "cached",
             "pair":       pair,
-            "action":     latest.get("action", "HOLD"),
+            "action":     latest.get("action",     "HOLD"),
             "confidence": latest.get("confidence", 0),
-            "reason":     latest.get("reason", "—"),
+            "reason":     latest.get("reason",     "—"),
         })
 
-    # لو ما في بيانات خالص
+    # لا يوجد بيانات
     return jsonify({
         "source":     "waiting",
         "pair":       pair,
