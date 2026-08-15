@@ -52,47 +52,40 @@ def get_orders():
         log.error(f"[Proxy] orders error: {e}")
         return []
 
+
 def compute_pnl(trades_list):
     """
-    P&L صحيح:
-    الخسارة/الربح الحقيقي = قيمة المحفظة الآن - رأس المال الأصلي
-    لكن بما أن OctoBot ما يعطينا القيمة الآن عبر API
-    نحسب فقط الصفقات المغلقة فعلاً
+    Correct P&L calculation:
+    Only count closed pairs (1 BUY matched with 1 SELL).
+    Unrealized (open BUY without matching SELL) are excluded.
     """
-    buy_trades  = [t for t in trades_list if "BUY"  in str(t.get("type","")).upper()]
-    sell_trades = [t for t in trades_list if "SELL" in str(t.get("type","")).upper()]
+    buy_trades  = [t for t in trades_list if "BUY"  in str(t.get("type", "")).upper()]
+    sell_trades = [t for t in trades_list if "SELL" in str(t.get("type", "")).upper()]
 
+    # Sort by time to match correctly
     buy_trades  = sorted(buy_trades,  key=lambda x: x.get("time", 0))
     sell_trades = sorted(sell_trades, key=lambda x: x.get("time", 0))
 
-    # فقط الصفقات المغلقة فعلاً — BUY + SELL متطابقة
+    # Only count closed pairs
     closed_count = min(len(buy_trades), len(sell_trades))
 
-    if closed_count == 0:
-        return {
-            "realized_pnl":   0,
-            "buy_trades":     len(buy_trades),
-            "sell_trades":    len(sell_trades),
-            "closed_pairs":   0,
-            "open_positions": len(buy_trades),
-            "total_trades":   len(trades_list),
-        }
+    total_bought = sum(float(t.get("cost", t.get("ref_market_cost", 0)) or 0)
+                       for t in buy_trades[:closed_count])
+    total_sold   = sum(float(t.get("cost", t.get("ref_market_cost", 0)) or 0)
+                       for t in sell_trades[:closed_count])
 
-    # حساب P&L فقط للصفقات المغلقة
-    realized_pnl = 0
-    for i in range(closed_count):
-        buy_cost  = float(buy_trades[i].get("cost",  buy_trades[i].get("ref_market_cost",  0)) or 0)
-        sell_cost = float(sell_trades[i].get("cost", sell_trades[i].get("ref_market_cost", 0)) or 0)
-        realized_pnl += sell_cost - buy_cost
+    realized_pnl = round(total_sold - total_bought, 4)
 
     return {
-        "realized_pnl":   round(realized_pnl, 4),
-        "buy_trades":     len(buy_trades),
-        "sell_trades":    len(sell_trades),
-        "closed_pairs":   closed_count,
+        "realized_pnl":  realized_pnl,
+        "buy_trades":    len(buy_trades),
+        "sell_trades":   len(sell_trades),
+        "closed_pairs":  closed_count,
         "open_positions": len(buy_trades) - closed_count,
-        "total_trades":   len(trades_list),
+        "total_trades":  len(trades_list),
     }
+
+
 @app.route("/health")
 def health():
     trades = get_trades()
@@ -109,33 +102,22 @@ def portfolio():
     try:
         trades_list = get_trades()
         orders_list = get_orders()
-        pnl_data    = compute_pnl(trades_list)
 
-        BASE_CAPITAL = float(os.getenv("BASE_CAPITAL", "30000"))
+        pnl_data = compute_pnl(trades_list)
 
-        # القيمة الحقيقية للمحفظة
-        # = رأس المال - ما أنفق في مشتريات مفتوحة + ما رجع من مبيعات
-        buy_trades  = [t for t in trades_list if "BUY"  in str(t.get("type","")).upper()]
-        sell_trades = [t for t in trades_list if "SELL" in str(t.get("type","")).upper()]
+        locked = round(sum(
+            float(o.get("cost", o.get("ref_market_cost", 0)) or 0)
+            for o in orders_list
+        ), 2)
 
-        total_bought   = sum(float(t.get("cost", t.get("ref_market_cost", 0)) or 0) for t in buy_trades)
-        total_sold     = sum(float(t.get("cost", t.get("ref_market_cost", 0)) or 0) for t in sell_trades)
-        locked_in_orders = round(sum(float(o.get("cost", 0) or 0) for o in orders_list), 2)
-
-        # USDT الحر = رأس المال - ما اشتريناه + ما بعناه
-        free_usdt = round(max(BASE_CAPITAL - total_bought + total_sold, 0), 2)
-
-        # القيمة الإجمالية المقدرة
-        # = USDT حر + قيمة العملات المشتراة (نقدرها بالتكلفة)
-        open_investment = round(total_bought - total_sold, 2)
-        total_value     = round(free_usdt + open_investment, 2)
+        BASE_CAPITAL = 30000.0
+        free_usdt = round(max(BASE_CAPITAL - locked, 0), 2)
 
         return jsonify({
             "source":                "live",
-            "total_portfolio_value": total_value,
+            "total_portfolio_value": BASE_CAPITAL,
             "free_usdt":             free_usdt,
-            "locked_usdt":           locked_in_orders,
-            "invested_usdt":         open_investment,
+            "locked_usdt":           locked,
             "currency":              "USDT",
             "total_trades":          pnl_data["total_trades"],
             "buy_trades":            pnl_data["buy_trades"],
@@ -151,8 +133,8 @@ def portfolio():
         log.error(f"[Proxy] portfolio error: {e}")
         return jsonify({
             "source":                "fallback",
-            "total_portfolio_value": 30000.0,
-            "free_usdt":             30000.0,
+            "total_portfolio_value": 10000.0,
+            "free_usdt":             10000.0,
             "locked_usdt":           0.0,
             "currency":              "USDT",
             "realized_pnl":          0,
