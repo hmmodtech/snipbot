@@ -110,8 +110,30 @@ def portfolio():
             for o in orders_list
         ), 2)
 
-        BASE_CAPITAL = 30000.0
-        free_usdt = round(max(BASE_CAPITAL - locked, 0), 2)
+        # Try to get real balance from KuCoin
+        kucoin_balance = None
+        try:
+            kc_key  = os.getenv("KUCOIN_API_KEY","")
+            kc_sec  = os.getenv("KUCOIN_SECRET","")
+            kc_pass = os.getenv("KUCOIN_PASS","")
+            if kc_key and kc_sec:
+                ex = ccxt.kucoin({"apiKey":kc_key,"secret":kc_sec,"password":kc_pass,"enableRateLimit":True})
+                try: ex.set_sandbox_mode(True)
+                except: pass
+                bal = ex.fetch_balance()
+                usdt_total = float((bal.get("total") or {}).get("USDT", 0) or 0)
+                usdt_free  = float((bal.get("free")  or {}).get("USDT", 0) or 0)
+                if usdt_total > 0:
+                    kucoin_balance = {"total": usdt_total, "free": usdt_free}
+        except Exception as kb_err:
+            log.warning(f"[Portfolio] KuCoin balance fetch failed: {kb_err}")
+
+        if kucoin_balance:
+            BASE_CAPITAL = kucoin_balance["total"]
+            free_usdt    = round(kucoin_balance["free"], 2)
+        else:
+            BASE_CAPITAL = 30000.0
+            free_usdt = round(max(BASE_CAPITAL - locked, 0), 2)
 
         return jsonify({
             "source":                "live",
@@ -443,6 +465,131 @@ def ai_analysis():
         "confidence": 0,
         "summary":    f"Scanning {symbol}...",
         "agents":     []
+    })
+
+
+# ══════════════════════════════════════════════════════════════════
+# REAL BALANCE FROM ANY EXCHANGE
+# GET /api/real_balance?exchange=kucoin
+# Reads keys from env vars: {EXCHANGE}_API_KEY, {EXCHANGE}_SECRET, {EXCHANGE}_PASS
+# Supports: kucoin, binance, bybit, okx — add keys to Railway vars to enable
+# ══════════════════════════════════════════════════════════════════
+@app.route("/api/real_balance")
+def real_balance():
+    exchange_id = request.args.get("exchange", "kucoin").lower().strip()
+    mode        = request.args.get("mode", "paper")
+
+    # Read keys from env vars dynamically — works for any exchange
+    prefix  = exchange_id.upper()
+    api_key = os.getenv(f"{prefix}_API_KEY", "")
+    secret  = os.getenv(f"{prefix}_SECRET",  "")
+    password= os.getenv(f"{prefix}_PASS",    "")
+
+    if not api_key or not secret:
+        return jsonify({
+            "status":   "not_configured",
+            "exchange": exchange_id,
+            "message":  f"Add {prefix}_API_KEY and {prefix}_SECRET to Railway variables",
+        }), 404
+
+    try:
+        ex_class = getattr(ccxt, exchange_id)
+        config   = {
+            "apiKey":          api_key,
+            "secret":          secret,
+            "enableRateLimit": True,
+            "options":         {"defaultType": "spot"},
+        }
+        if password:
+            config["password"] = password
+
+        ex = ex_class(config)
+
+        # Paper trading sandbox
+        if mode == "paper":
+            try: ex.set_sandbox_mode(True)
+            except: pass
+
+        balance      = ex.fetch_balance()
+        total_usdt   = 0.0
+        free_usdt    = 0.0
+        assets_detail= []
+
+        for asset, amt in (balance.get("total") or {}).items():
+            if not amt or float(amt) <= 0:
+                continue
+            val = float(amt)
+            if asset in ("USDT", "USDC", "BUSD", "TUSD"):
+                total_usdt += val
+                free_usdt  += float((balance.get("free") or {}).get(asset, 0) or 0)
+                assets_detail.append({"asset": asset, "balance": val, "value_usdt": val})
+            else:
+                try:
+                    ticker = ex.fetch_ticker(f"{asset}/USDT")
+                    price  = float(ticker.get("last") or 0)
+                    worth  = val * price
+                    if worth > 0.5:  # فقط الأصول ذات قيمة > $0.5
+                        total_usdt += worth
+                        assets_detail.append({"asset": asset, "balance": val,
+                                              "price_usdt": price, "value_usdt": round(worth, 2)})
+                except: pass
+
+        # Open positions PnL
+        unrealized_pnl = 0.0
+        try:
+            for pos in (ex.fetch_positions() or []):
+                unrealized_pnl += float(pos.get("unrealizedPnl") or 0)
+        except: pass
+
+        log.info(f"[RealBalance] {exchange_id} → ${total_usdt:.2f} USDT ({mode})")
+
+        return jsonify({
+            "status":          "live",
+            "exchange":        exchange_id,
+            "mode":            mode,
+            "total_usdt":      round(total_usdt, 2),
+            "free_usdt":       round(free_usdt, 2),
+            "locked_usdt":     round(total_usdt - free_usdt, 2),
+            "unrealized_pnl":  round(unrealized_pnl, 2),
+            "assets":          assets_detail,
+            "timestamp":       datetime.utcnow().isoformat(),
+        })
+
+    except ccxt.AuthenticationError:
+        return jsonify({"status":"auth_error","error":"Check API keys","exchange":exchange_id}), 401
+    except ccxt.NetworkError as e:
+        return jsonify({"status":"network_error","error":str(e)}), 503
+    except AttributeError:
+        return jsonify({"status":"error","error":f"Exchange '{exchange_id}' not supported"}), 400
+    except Exception as e:
+        log.error(f"[RealBalance] {exchange_id} error: {e}")
+        return jsonify({"status":"error","error":str(e)[:200]}), 500
+
+
+# ══════════════════════════════════════════════════════════════════
+# LIST CONFIGURED EXCHANGES
+# GET /api/exchanges/configured
+# Returns which exchanges have API keys in Railway vars
+# ══════════════════════════════════════════════════════════════════
+@app.route("/api/exchanges/configured")
+def configured_exchanges():
+    supported = ["kucoin", "binance", "bybit", "okx", "kraken", "bitget"]
+    result    = []
+    for ex_id in supported:
+        prefix  = ex_id.upper()
+        has_key = bool(os.getenv(f"{prefix}_API_KEY"))
+        has_sec = bool(os.getenv(f"{prefix}_SECRET"))
+        if has_key and has_sec:
+            result.append({
+                "exchange":      ex_id,
+                "configured":    True,
+                "has_password":  bool(os.getenv(f"{prefix}_PASS")),
+                "balance_url":   f"/api/real_balance?exchange={ex_id}",
+            })
+    return jsonify({
+        "status":     "success",
+        "configured": result,
+        "total":      len(result),
     })
 
 if __name__ == "__main__":
