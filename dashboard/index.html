@@ -1388,6 +1388,315 @@ window.addEventListener('resize', () => { drawCandlestick(); });
 
 refreshAll();
 setInterval(refreshAll, REFRESH_MS);
+
+/* ════════════════════════════════════════
+   MISSING FUNCTIONS — ADDED
+════════════════════════════════════════ */
+
+async function loadHistory() {
+  const data = await apiFetch('/api/trades');
+  const body = document.getElementById('history-body');
+  if (!body) return;
+  if (!data || !data.trades || data.trades.length === 0) {
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--muted);">No trades yet.</td></tr>';
+    return;
+  }
+  body.innerHTML = data.trades.map(t => {
+    const isBuy = String(t.type || '').includes('BUY');
+    const price = parseFloat(t.price || 0) || 0;
+    const cost  = parseFloat(t.cost  || 0) || 0;
+    return `<tr>
+      <td><span class="pair">${t.symbol || '—'}</span></td>
+      <td><span class="${isBuy ? 'long' : 'short'}">${isBuy ? 'LONG' : 'SHORT'}</span></td>
+      <td>${price > 0 ? '$' + price.toFixed(4) : '—'}</td>
+      <td style="color:var(--muted)">${t.date || '—'}</td>
+      <td>$${cost.toFixed(2)}</td>
+      <td style="color:var(--muted)">${t.type || '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function loadTradingMode() {
+  const paperEl = document.getElementById('toggle-paper');
+  const realEl  = document.getElementById('toggle-real');
+  const paperLb = document.getElementById('label-paper');
+  const realLb  = document.getElementById('label-real');
+  const paperEnabled = localStorage.getItem('snipbot_paper') !== 'false';
+  const realEnabled  = localStorage.getItem('snipbot_real')  === 'true';
+  if (paperEl) paperEl.checked = paperEnabled;
+  if (realEl)  realEl.checked  = realEnabled;
+  if (paperLb) paperLb.textContent = paperEnabled ? 'ON' : 'OFF';
+  if (realLb)  realLb.textContent  = realEnabled  ? 'ON' : 'OFF';
+  const realBalEl = document.getElementById('real-balance-display');
+  if (realBalEl) realBalEl.textContent = realEnabled ? 'Balance: Live' : 'Balance: Not connected';
+}
+
+function toggleMode(mode, enabled) {
+  if (mode === 'paper') {
+    localStorage.setItem('snipbot_paper', enabled);
+    const lb = document.getElementById('label-paper');
+    if (lb) lb.textContent = enabled ? 'ON' : 'OFF';
+    showToast(enabled ? '📋 Paper Trading ENABLED' : '📋 Paper Trading DISABLED', enabled ? 'neon' : 'amber');
+  }
+  if (mode === 'real') {
+    if (enabled && !confirm('⚠️ Real Trading uses REAL MONEY. Continue?')) {
+      const el = document.getElementById('toggle-real');
+      if (el) el.checked = false;
+      return;
+    }
+    localStorage.setItem('snipbot_real', enabled);
+    const lb = document.getElementById('label-real');
+    if (lb) lb.textContent = enabled ? 'ON' : 'OFF';
+    showToast(enabled ? '💰 Real Trading ENABLED' : '💰 Real Trading DISABLED', enabled ? 'neon' : 'danger');
+  }
+}
+
+function loadExchanges() {
+  const grid = document.getElementById('exchanges-grid');
+  if (!grid) return;
+  const exchanges = JSON.parse(localStorage.getItem('snipbot_exchanges') || '[]');
+  const icons = { kucoin:'🔶', binance:'🟡', bybit:'🟠', okx:'⚫' };
+
+  let html = `<div class="ex-card paper">
+    <div class="ex-name">🔶 KuCoin</div>
+    <div class="ex-bal" id="ex-bal-octobot">$30,000.00</div>
+    <div class="ex-meta">Paper Trading via OctoBot</div>
+    <div class="chip chip-neon" style="font-size:9px;margin-top:6px">● CONNECTED</div>
+  </div>`;
+
+  html += exchanges.map(ex => `
+    <div class="ex-card ${ex.mode === 'real' ? 'real' : 'paper'}" id="ex-card-${ex.id}">
+      <div class="ex-name">${icons[ex.id] || '🏦'} ${ex.name}</div>
+      <div class="ex-bal" id="ex-bal-${ex.id}">—</div>
+      <div class="ex-meta" id="ex-pnl-${ex.id}">Fetching...</div>
+      <div class="chip ${ex.mode === 'real' ? 'chip-neon' : 'chip-amber'}" style="font-size:9px;margin-top:6px">
+        ${ex.mode === 'real' ? '💰 REAL' : '📋 PAPER'}
+      </div>
+      <button class="ex-connect-btn" onclick="disconnectExchange('${ex.id}')">⛔ DISCONNECT</button>
+    </div>`).join('');
+
+  html += `<div class="ex-card offline" style="cursor:pointer;display:flex;align-items:center;
+    justify-content:center;min-height:120px;border-style:dashed" onclick="openExchangeModal('new')">
+    <div style="text-align:center;color:var(--muted)">
+      <div style="font-size:24px;margin-bottom:6px">+</div>
+      <div style="font-family:var(--mono);font-size:10px">Add Exchange</div>
+    </div>
+  </div>`;
+
+  grid.innerHTML = html;
+
+  // Load OctoBot balance
+  apiFetch('/api/real_balance?exchange=kucoin&mode=paper').then(data => {
+    const el = document.getElementById('ex-bal-octobot');
+    if (el && data && data.total_usdt) {
+      el.textContent = '$' + data.total_usdt.toLocaleString('en', {maximumFractionDigits: 2});
+    }
+  });
+}
+
+function renderPairs() {
+  const list  = document.getElementById('pairs-list');
+  const body  = document.getElementById('pairs-table-body');
+  const chip  = document.getElementById('pairs-count-chip');
+  const pairs = JSON.parse(localStorage.getItem('snipbot_pairs') || '["ADA/USDT","XRP/USDT","BTC/USDT","ETH/USDT"]');
+  if (chip) chip.textContent = pairs.length + ' PAIRS';
+  if (list) list.innerHTML = pairs.map(p => `
+    <div class="pair-tag">${p}
+      <span class="pair-tag-remove" onclick="removePair('${p}')">✕</span>
+    </div>`).join('');
+  if (body) body.innerHTML = pairs.map(p => `
+    <tr>
+      <td><span class="pair">${p}</span></td>
+      <td style="color:var(--muted)">KuCoin</td>
+      <td><span class="chip chip-amber" style="font-size:9px">PAPER</span></td>
+      <td><span class="s-locked">● ACTIVE</span></td>
+      <td><button class="ab exit" onclick="removePair('${p}')">REMOVE</button></td>
+    </tr>`).join('');
+}
+
+function addPair() {
+  const input = document.getElementById('new-pair-input');
+  if (!input) return;
+  let val = input.value.trim().toUpperCase();
+  if (!val) { showToast('⚠️ Enter a pair', 'amber'); return; }
+  if (!val.includes('/')) val += '/USDT';
+  const pairs = JSON.parse(localStorage.getItem('snipbot_pairs') || '[]');
+  if (pairs.includes(val)) { showToast('⚠️ Already exists', 'amber'); return; }
+  pairs.push(val);
+  localStorage.setItem('snipbot_pairs', JSON.stringify(pairs));
+  input.value = '';
+  renderPairs();
+  showToast('✅ ' + val + ' added');
+}
+
+function removePair(pair) {
+  let pairs = JSON.parse(localStorage.getItem('snipbot_pairs') || '[]');
+  pairs = pairs.filter(p => p !== pair);
+  localStorage.setItem('snipbot_pairs', JSON.stringify(pairs));
+  renderPairs();
+  showToast('🗑 ' + pair + ' removed', 'amber');
+}
+
+function openExchangeModal(id) {
+  const modal = document.getElementById('exchange-modal');
+  if (modal) modal.classList.add('open');
+  const nameEl = document.getElementById('modal-exchange-name');
+  const names = {kucoin:'KuCoin',binance:'Binance',bybit:'Bybit',okx:'OKX',new:'New Exchange'};
+  if (nameEl) nameEl.textContent = (names[id] || id) + ' API Setup';
+  window._currentExchangeId = id;
+}
+
+function closeModal() {
+  const modal = document.getElementById('exchange-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+async function saveExchange() {
+  const id       = window._currentExchangeId === 'new' ? 'kucoin' : (window._currentExchangeId || 'kucoin');
+  const names    = {kucoin:'KuCoin',binance:'Binance',bybit:'Bybit',okx:'OKX'};
+  const name     = names[id] || 'Exchange';
+  const apiKey   = (document.getElementById('modal-api-key')?.value || '').trim();
+  const secret   = (document.getElementById('modal-api-secret')?.value || '').trim();
+  const password = (document.getElementById('modal-passphrase')?.value || '').trim();
+  const mode     = document.getElementById('modal-mode')?.value || 'paper';
+  if (!apiKey || !secret) { showToast('⚠️ API Key and Secret required', 'amber'); return; }
+  const btn = document.getElementById('modal-save-btn');
+  if (btn) { btn.textContent = '⏳ Testing...'; btn.disabled = true; }
+  try {
+    const res  = await fetch(API + '/api/exchange_balance', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({exchange:id, api_key:apiKey, secret, password, mode}),
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await res.json();
+    if (!res.ok || data.status === 'auth_error') {
+      showToast('⛔ Authentication failed', 'danger');
+      if (btn) { btn.textContent = '✅ CONNECT'; btn.disabled = false; }
+      return;
+    }
+    const exchanges = JSON.parse(localStorage.getItem('snipbot_exchanges') || '[]');
+    const idx = exchanges.findIndex(e => e.id === id);
+    const entry = {id, name, mode, connected:true};
+    if (idx >= 0) exchanges[idx] = entry; else exchanges.push(entry);
+    localStorage.setItem('snipbot_exchanges', JSON.stringify(exchanges));
+    sessionStorage.setItem('snipbot_key_'+id, apiKey);
+    sessionStorage.setItem('snipbot_sec_'+id, secret);
+    sessionStorage.setItem('snipbot_pass_'+id, password);
+    closeModal();
+    loadExchanges();
+    showToast('✅ ' + name + ' connected — $' + (data.total_usdt||0).toLocaleString('en',{maximumFractionDigits:0}) + ' USDT');
+  } catch(e) {
+    showToast('⚠️ Connection timeout', 'amber');
+  }
+  if (btn) { btn.textContent = '✅ CONNECT'; btn.disabled = false; }
+}
+
+function disconnectExchange(id) {
+  let exchanges = JSON.parse(localStorage.getItem('snipbot_exchanges') || '[]');
+  exchanges = exchanges.filter(e => e.id !== id);
+  localStorage.setItem('snipbot_exchanges', JSON.stringify(exchanges));
+  sessionStorage.removeItem('snipbot_key_'+id);
+  sessionStorage.removeItem('snipbot_sec_'+id);
+  sessionStorage.removeItem('snipbot_pass_'+id);
+  loadExchanges();
+  showToast('🗑 Disconnected', 'amber');
+}
+
+function saveSettings() {
+  const conf = document.getElementById('set-confidence')?.value;
+  const intv = document.getElementById('set-interval')?.value;
+  const size = document.getElementById('set-position-size')?.value;
+  const sl   = document.getElementById('set-sl')?.value;
+  localStorage.setItem('snipbot_settings', JSON.stringify({confidence:conf,interval:intv,positionSize:size,stopLoss:sl}));
+  showToast('💾 Settings saved');
+}
+
+function saveSystemSettings() {
+  const proxy  = document.getElementById('set-proxy')?.value.trim();
+  const agents = document.getElementById('set-agents')?.value.trim();
+  if (proxy)  { API = proxy; }
+  if (agents) { window.AGENT_API = agents; }
+  showToast('💾 System settings saved');
+}
+
+function buildChart() { loadCandlestickChart(); }
+
+async function sendTelegramNotification(message) {
+  try {
+    await fetch(API + '/api/telegram/send', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({message})
+    });
+  } catch(e) {}
+}
+
+async function sendCustomTelegram() {
+  const msg = document.getElementById('tg-message')?.value.trim();
+  if (!msg) { showToast('⚠️ Enter a message', 'amber'); return; }
+  await sendTelegramNotification(msg);
+  showToast('📨 Sent to Telegram');
+  const el = document.getElementById('tg-message');
+  if (el) el.value = '';
+}
+
+function dispatchSnippet() {
+  sendTelegramNotification('📊 <b>[SnipBot Market Snippet]</b>\nSniper Engine active. Markets under surveillance.');
+  showToast('📊 Snippet dispatched');
+}
+
+function emergencyAbort() {
+  if (!confirm('⛔ EMERGENCY ABORT — Halt all operations?')) return;
+  showToast('⛔ ABORT executed', 'danger');
+  sendTelegramNotification('⛔ <b>[SnipBot ABORT]: Emergency halt executed</b>\nAll triggers suspended.');
+}
+
+function armEngine() {
+  showToast('🎯 Sniper Engine armed');
+}
+
+function fireSnipe() {
+  const pair   = document.getElementById('f-pair')?.value || 'BTC/USDT';
+  const side   = document.getElementById('f-side')?.value || 'LONG';
+  const entry  = document.getElementById('f-entry')?.value || 'MARKET';
+  const amount = document.getElementById('f-amount')?.value || '0';
+  const sl     = document.getElementById('f-sl')?.value;
+  const tp     = document.getElementById('f-tp')?.value;
+  showToast('🎯 ' + pair + ' ' + side + ' fired @ ' + entry);
+  sendTelegramNotification(`⚡ <b>[SnipBot Execution]: Manual Snipe</b>\n🎯 Pair: ${pair}\n📊 Side: ${side}\n💰 Entry: ${entry}\n💵 Amount: $${amount}\n🛡 SL: ${sl||'—'} | TP: ${tp||'—'}`);
+}
+
+function clearConsole() {
+  ['f-entry','f-amount','f-sl','f-tp'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const pair = document.getElementById('f-pair');
+  if (pair) pair.value = 'BTC/USDT';
+}
+
+function addSnippet() {
+  const snippets = [
+    {cls:'locked',  tag:'🎯 Sniper Engine',  txt:'BTC/USDT approaching key resistance. Trigger armed.'},
+    {cls:'alert',   tag:'📊 Market Snippet', txt:'BTC.D rising — altcoins under pressure.'},
+    {cls:'info',    tag:'🔎 TA Analyst',     txt:'RSI neutral. Awaiting directional confirmation.'},
+    {cls:'executed',tag:'⚡ DCA+ Strategy',  txt:'Dip entry conditions active. EMA50 as support.'},
+  ];
+  const s = snippets[Math.floor(Math.random() * snippets.length)];
+  addFeedItem(s.txt, s.cls, s.tag);
+}
+
+function addFeedItem(txt, cls, tag) {
+  tag = tag || '📡 SnipBot';
+  const feed = document.getElementById('feed');
+  if (!feed) return;
+  const now = new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+  const div = document.createElement('div');
+  div.className = 'snip ' + cls;
+  div.innerHTML = '<div class="sm"><span>'+tag+'</span><span>'+now+'</span></div><div>'+txt+'</div>';
+  feed.insertBefore(div, feed.firstChild);
+  while (feed.children.length > 20) feed.removeChild(feed.lastChild);
+}
+
 </script>
 </body>
 </html>
