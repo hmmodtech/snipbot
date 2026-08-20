@@ -942,6 +942,7 @@ async function loadPortfolio() {
   }
 
   if (document.getElementById('ov-locked')) document.getElementById('ov-locked').textContent = '$' + Number(locked).toLocaleString('en', { maximumFractionDigits: 2 });
+  if (document.getElementById('ov-locked-d')) document.getElementById('ov-locked-d').textContent = locked > 0 ? 'In open orders' : 'No locked orders';
   if (document.getElementById('ov-trades')) document.getElementById('ov-trades').textContent = trades;
   if (document.getElementById('ov-trades-d')) document.getElementById('ov-trades-d').textContent = buyCount + ' BUY · ' + sellCount + ' SELL';
   
@@ -962,7 +963,7 @@ function loadMockPortfolio() {
   if (document.getElementById('ov-reserve-d')) document.getElementById('ov-reserve-d').textContent = 'Fully Invested in ADA/XRP';
   
   if (document.getElementById('ov-locked')) document.getElementById('ov-locked').textContent = '$0';
-  if (document.getElementById('ov-locked-d')) document.getElementById('ov-locked-d').textContent = 'In open orders';
+  if (document.getElementById('ov-locked-d')) document.getElementById('ov-locked-d').textContent = 'No locked orders';
   
   if (document.getElementById('ov-trades')) document.getElementById('ov-trades').textContent = '107';
   if (document.getElementById('ov-trades-d')) document.getElementById('ov-trades-d').textContent = '66 BUY · 41 SELL';
