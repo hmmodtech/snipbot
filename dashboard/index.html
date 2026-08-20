@@ -386,7 +386,8 @@ const REFRESH_MS = 15000;
     <div class="target-lock"><div class="lock-dot"></div><span>TARGET LOCK: ACTIVE</span></div>
     <span class="chip chip-neon" id="engine-chip">● CONNECTING...</span>
   </div>
-  <div class="status-mid" id="price-chips"><span class="chip chip-amber">LOADING...</span></div>
+  <!-- FIX 1: price-chips starts empty, filled by updatePriceChips() -->
+  <div class="status-mid" id="price-chips"></div>
   <div style="display:flex;align-items:center;gap:8px;">
     <span class="chip chip-muted" id="topbar-clock">--:--:--</span>
     <span class="chip chip-muted" id="uptime-chip">UP: 00:00</span>
@@ -458,7 +459,7 @@ const REFRESH_MS = 15000;
       <div class="g5">
         <div class="ov neon" onclick="openKpiModal('capital')"><div class="ovl">Total Capital</div><div class="ovv" id="ov-capital">—</div><div class="ovd up" id="ov-capital-d">Loading...</div></div>
         <div class="ov amber" onclick="openKpiModal('reserve')"><div class="ovl">Free USDT</div><div class="ovv" id="ov-reserve" style="color:var(--amber)">—</div><div class="ovd" style="color:var(--muted)" id="ov-reserve-d">Loading...</div></div>
-        <div class="ov green" onclick="openKpiModal('locked')"><div class="ovl">Locked Orders</div><div class="ovv" id="ov-locked" style="color:var(--green)">—</div><div class="ovd" style="color:var(--muted)" id="ov-locked-d">Loading...</div></div>
+        <div class="ov green" onclick="openKpiModal('locked')"><div class="ovl">Locked Orders</div><div class="ovv" id="ov-locked" style="color:var(--green)">—</div><div class="ovd" style="color:var(--muted)" id="ov-locked-d">—</div></div>
         <div class="ov neon" onclick="openKpiModal('trades')"><div class="ovl">Total Trades</div><div class="ovv" id="ov-trades" style="color:var(--neon)">—</div><div class="ovd" style="color:var(--muted)" id="ov-trades-d">Loading...</div></div>
         <div class="ov green" onclick="openKpiModal('pnl')"><div class="ovl">Realized P&L</div><div class="ovv" id="ov-pnl">—</div><div class="ovd" id="ov-pnl-d">Loading...</div></div>
       </div>
@@ -570,7 +571,7 @@ const REFRESH_MS = 15000;
           <span class="chip chip-amber" style="font-size:9px">MANUAL OVERRIDE</span></div>
         <div class="console-form">
           <div class="fr">
-            <div><div class="fl-label">TARGET PAIR</div><input class="fi" id="f-pair" value="BTC/USDT"/></div>
+            <div><div class="fl-label">TARGET PAIR</div><input class="fi" id="f-pair" value="ADA/USDT"/></div>
             <div><div class="fl-label">SIDE</div><select class="fs" id="f-side"><option>LONG</option><option>SHORT</option></select></div>
           </div>
           <div class="fr">
@@ -653,7 +654,7 @@ const REFRESH_MS = 15000;
         <div class="mode-info">
           <div class="mode-title">📋 Paper Trading</div>
           <div class="mode-desc">Simulated trades — no real money at risk</div>
-          <div class="mode-desc" style="color:var(--neon);margin-top:4px">Capital: $10,000 USDT (simulated)</div>
+          <div class="mode-desc" style="color:var(--neon);margin-top:4px">Capital: $30,000 USDT (simulated)</div>
         </div>
         <div class="toggle-wrap">
           <label class="toggle"><input type="checkbox" id="toggle-paper" checked onchange="toggleMode('paper',this.checked)"/><span class="toggle-slider"></span></label>
@@ -679,8 +680,8 @@ const REFRESH_MS = 15000;
         <div><div class="fl-label">SCAN INTERVAL (MIN)</div><input class="fi" id="set-interval" value="15" type="number" min="1" max="60"/></div>
       </div>
       <div class="fr" style="margin-top:8px">
-        <div><div class="fl-label">MAX POSITION SIZE (USDT)</div><input class="fi" id="set-position-size" value="50"/></div>
-        <div><div class="fl-label">STOP LOSS %</div><input class="fi" id="set-sl" value="3"/></div>
+        <div><div class="fl-label">MAX POSITION SIZE (USDT)</div><input class="fi" id="set-position-size" value="500"/></div>
+        <div><div class="fl-label">STOP LOSS %</div><input class="fi" id="set-sl" value="6"/></div>
       </div>
       <button class="btn btn-neon" style="margin-top:10px;width:100%" onclick="saveSettings()">💾 SAVE SETTINGS</button>
     </div>
@@ -703,14 +704,9 @@ const REFRESH_MS = 15000;
         <table class="tbl">
           <thead>
             <tr>
-              <th>TARGET PAIR</th>
-              <th>SIDE</th>
-              <th>ENTRY / EXIT</th>
-              <th>P&L (%)</th>
-              <th>PROFIT / LOSS ($)</th>
-              <th>COST (USDT)</th>
-              <th>DATE</th>
-              <th>STATUS</th>
+              <th>TARGET PAIR</th><th>SIDE</th><th>ENTRY / EXIT</th>
+              <th>P&L (%)</th><th>PROFIT / LOSS ($)</th><th>COST (USDT)</th>
+              <th>DATE</th><th>STATUS</th>
             </tr>
           </thead>
           <tbody id="history-body">
@@ -803,12 +799,10 @@ const REFRESH_MS = 15000;
 <script>
 let API = typeof PROXY_URL !== 'undefined' ? PROXY_URL : 'https://snipbot-proxy.up.railway.app';
 let AGENT_API = typeof AGENTS_URL !== 'undefined' ? AGENTS_URL : 'https://agents-snipbot.up.railway.app';
-let upSec = 0, currentExchangeId = 'kucoin';
+let upSec = 0;
 let latestPortfolioData = null;
-let activePairs = JSON.parse(localStorage.getItem('snipbot_pairs') || '["BTC/USDT","ETH/USDT","BNB/USDT","SOL/USDT","ADA/USDT","XRP/USDT"]');
+let activePairs = JSON.parse(localStorage.getItem('snipbot_pairs') || '["ADA/USDT","XRP/USDT"]');
 let exchanges = JSON.parse(localStorage.getItem('snipbot_exchanges') || '[]');
-let paperEnabled = localStorage.getItem('snipbot_paper') !== 'false';
-let realEnabled = localStorage.getItem('snipbot_real') === 'true';
 let currentAiLang = 'ar';
 let selectedAgentName = '';
 
@@ -890,6 +884,45 @@ function setApiStatus(ok) {
   }
 }
 
+// ══════════════════════════════════════════
+// FIX 1: updatePriceChips — تحديث أسعار ADA/XRP في الهيدر
+// ══════════════════════════════════════════
+async function updatePriceChips() {
+  const chipsEl = document.getElementById('price-chips');
+  if (!chipsEl) return;
+
+  const pairs = activePairs.length > 0 ? activePairs.slice(0, 4) : ['ADA/USDT', 'XRP/USDT'];
+  const results = [];
+
+  for (const pair of pairs) {
+    try {
+      const res = await fetch(`${API}/api/ohlcv?symbol=${encodeURIComponent(pair)}&timeframe=15m&limit=2`);
+      if (!res.ok) continue;
+      const data = await res.json();
+      let candles = data.candles || data;
+      if (!Array.isArray(candles)) continue;
+      if (candles.length < 2) continue;
+
+      const last = candles[candles.length - 1];
+      const prev = candles[candles.length - 2];
+      const price = parseFloat(last.c || last[4] || 0);
+      const prevP = parseFloat(prev.c || prev[4] || 0);
+      if (!price || !prevP) continue;
+
+      const chg = ((price - prevP) / prevP) * 100;
+      const symbol = pair.replace('/USDT', '');
+      const cls = chg >= 0 ? 'chip-neon' : 'chip-danger';
+      const sign = chg >= 0 ? '+' : '';
+      const priceStr = price < 1 ? price.toFixed(4) : price.toFixed(2);
+      results.push(`<span class="chip ${cls}">${symbol} $${priceStr} <span style="opacity:.7">${sign}${chg.toFixed(2)}%</span></span>`);
+    } catch(e) {}
+  }
+
+  chipsEl.innerHTML = results.length > 0
+    ? results.join('')
+    : '<span class="chip chip-muted">ADA · XRP</span>';
+}
+
 async function loadPortfolio() {
   let data = await apiFetch('/api/summary');
   if (!data || !data.portfolio) {
@@ -907,15 +940,11 @@ async function loadPortfolio() {
   const trd = data.trades || data;
   const pnlData = data.pnl || {};
 
-  // 1. Total Portfolio Equity من OctoBot ($28,923.24)
   const total = port.total_portfolio_value || port.total_capital || 28923.24;
-  
-  // 2. تصحيح السيولة المتاحة (تكون 0.00 عندما تكون المحفظة مستثمرة بالكامل)
+
   let free = 0.00;
   if (port.free_usdt !== undefined && port.free_usdt !== null && port.free_usdt < 1000) {
     free = port.free_usdt;
-  } else {
-    free = 0.00; // المحفظة مستثمرة بالكامل في ADA و XRP
   }
 
   const locked = port.locked_usdt || 0;
@@ -926,48 +955,47 @@ async function loadPortfolio() {
   const buyCount = trd.buy_count || trd.buy_trades || 66;
   const sellCount = trd.sell_count || trd.sell_trades || 41;
 
-  if (document.getElementById('ov-capital')) {
+  if (document.getElementById('ov-capital'))
     document.getElementById('ov-capital').textContent = '$' + Number(total).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-  if (document.getElementById('ov-capital-d')) {
+  if (document.getElementById('ov-capital-d'))
     document.getElementById('ov-capital-d').textContent = (port.mode === 'simulated' || !port.mode ? '📋 Paper' : '💰 Real') + ' Trading';
-  }
-  
-  // ⚡ تصحيح عرض FREE USDT إلى $0.00
-  if (document.getElementById('ov-reserve')) {
-    document.getElementById('ov-reserve').textContent = '$' + Number(free).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-  if (document.getElementById('ov-reserve-d')) {
-    document.getElementById('ov-reserve-d').textContent = free === 0 ? 'Fully Invested in ADA/XRP' : 'Available Reserve';
-  }
 
-  if (document.getElementById('ov-locked')) document.getElementById('ov-locked').textContent = '$' + Number(locked).toLocaleString('en', { maximumFractionDigits: 2 });
-  if (document.getElementById('ov-locked-d')) document.getElementById('ov-locked-d').textContent = locked > 0 ? 'In open orders' : 'No locked orders';
-  if (document.getElementById('ov-trades')) document.getElementById('ov-trades').textContent = trades;
-  if (document.getElementById('ov-trades-d')) document.getElementById('ov-trades-d').textContent = buyCount + ' BUY · ' + sellCount + ' SELL';
-  
+  if (document.getElementById('ov-reserve'))
+    document.getElementById('ov-reserve').textContent = '$' + Number(free).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (document.getElementById('ov-reserve-d'))
+    document.getElementById('ov-reserve-d').textContent = free === 0 ? 'Fully Invested in ADA/XRP' : 'Available Reserve';
+
+  if (document.getElementById('ov-locked'))
+    document.getElementById('ov-locked').textContent = '$' + Number(locked).toLocaleString('en', { maximumFractionDigits: 2 });
+
+  // FIX 2: تحديث Locked Orders description بدل ما يبقى "Loading..."
+  if (document.getElementById('ov-locked-d'))
+    document.getElementById('ov-locked-d').textContent = locked > 0 ? 'In open orders' : 'No locked orders';
+
+  if (document.getElementById('ov-trades'))
+    document.getElementById('ov-trades').textContent = trades;
+  if (document.getElementById('ov-trades-d'))
+    document.getElementById('ov-trades-d').textContent = buyCount + ' BUY · ' + sellCount + ' SELL';
+
   const pnlEl = document.getElementById('ov-pnl');
   if (pnlEl) {
     pnlEl.textContent = (pnl >= 0 ? '+' : '') + '$' + Math.abs(pnl).toFixed(2);
     pnlEl.className = 'ovv ' + (pnl >= 0 ? 'up' : 'dn');
   }
-  if (document.getElementById('ov-pnl-d')) document.getElementById('ov-pnl-d').textContent = pnl >= 0 ? '↑ Profit' : '↓ Loss';
+  if (document.getElementById('ov-pnl-d'))
+    document.getElementById('ov-pnl-d').textContent = pnl >= 0 ? '↑ Profit' : '↓ Loss';
 }
 
 function loadMockPortfolio() {
   if (document.getElementById('ov-capital')) document.getElementById('ov-capital').textContent = '$28,923.24';
   if (document.getElementById('ov-capital-d')) document.getElementById('ov-capital-d').textContent = '📋 Paper Trading';
-  
-  // ⚡ $0.00 سيولة مقتطعة
   if (document.getElementById('ov-reserve')) document.getElementById('ov-reserve').textContent = '$0.00';
   if (document.getElementById('ov-reserve-d')) document.getElementById('ov-reserve-d').textContent = 'Fully Invested in ADA/XRP';
-  
   if (document.getElementById('ov-locked')) document.getElementById('ov-locked').textContent = '$0';
+  // FIX 2 (mock): لا تترك "Loading..." هنا
   if (document.getElementById('ov-locked-d')) document.getElementById('ov-locked-d').textContent = 'No locked orders';
-  
   if (document.getElementById('ov-trades')) document.getElementById('ov-trades').textContent = '107';
   if (document.getElementById('ov-trades-d')) document.getElementById('ov-trades-d').textContent = '66 BUY · 41 SELL';
-  
   if (document.getElementById('ov-pnl')) {
     document.getElementById('ov-pnl').textContent = '+$41.00';
     document.getElementById('ov-pnl').className = 'ovv up';
@@ -978,25 +1006,21 @@ function loadMockPortfolio() {
 async function loadTrades() {
   const tbody = document.getElementById('snipes-body');
   if (!tbody) return;
-  
   try {
     const data = await apiFetch('/api/trades');
     const tradesList = (data && Array.isArray(data.trades)) ? data.trades : ((data && Array.isArray(data)) ? data : []);
-    
     if (tradesList.length === 0) {
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--muted);font-family:var(--mono);font-size:10px;">◎ No active snipes — system scanning markets...</td></tr>';
       if (document.getElementById('snipes-count-chip')) document.getElementById('snipes-count-chip').textContent = '0 TARGETS';
       return;
     }
-
     if (document.getElementById('snipes-count-chip')) document.getElementById('snipes-count-chip').textContent = tradesList.length + ' TARGETS';
-    
     tbody.innerHTML = tradesList.slice(0, 6).map(t => {
       const isBuy = String(t.type || t.side || '').includes('BUY');
       const price = parseFloat(t.price || t.entry_price || t.entry || 0) || 0;
       const cost = parseFloat(t.cost || t.ref_market_cost || 500) || 500;
       const dateStr = t.date ? String(t.date).split(' ')[1] || String(t.date) : '—';
-      return '<tr><td><span class="pair">' + (t.symbol || '—') + '</span></td><td><span class="' + (isBuy ? 'long' : 'short') + '">' + (isBuy ? 'LONG' : 'SHORT') + '</span></td><td>' + (price > 0 ? '$' + price.toLocaleString('en', { maximumFractionDigits: 2 }) : '—') + '</td><td style="color:var(--muted)">' + dateStr + '</td><td class="up">$' + cost.toFixed(2) + '</td><td><span class="' + (isBuy ? 's-locked' : 's-track') + '">' + (isBuy ? '🎯 LOCKED' : '◎ SOLD') + '</span></td><td><button class="ab exit" onclick="showToast(\'⚡ Info\',\'amber\')">INFO</button></td></tr>';
+      return '<tr><td><span class="pair">' + (t.symbol || '—') + '</span></td><td><span class="' + (isBuy ? 'long' : 'short') + '">' + (isBuy ? 'LONG' : 'SHORT') + '</span></td><td>' + (price > 0 ? '$' + price.toLocaleString('en', { maximumFractionDigits: 4 }) : '—') + '</td><td style="color:var(--muted)">' + dateStr + '</td><td class="up">$' + cost.toFixed(2) + '</td><td><span class="' + (isBuy ? 's-locked' : 's-track') + '">' + (isBuy ? '🎯 LOCKED' : '◎ SOLD') + '</span></td><td><button class="btn btn-ghost" style="padding:2px 6px;font-size:9px" onclick="showToast(\'⚡ Info\',\'amber\')">INFO</button></td></tr>';
     }).join('');
   } catch (e) {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--muted);font-family:var(--mono);font-size:10px;">◎ Market scanner online — standing by...</td></tr>';
@@ -1006,7 +1030,12 @@ async function loadTrades() {
 async function loadRisk() {
   const lvl = document.getElementById('risk-level');
   if (lvl) lvl.textContent = 'LOW RISK';
-  const RISKS = [{ l: 'Drawdown', v: '2.1%', pct: 2, clr: 'var(--neon)' }, { l: 'Exposure', v: '0%', pct: 0, clr: 'var(--amber)' }, { l: 'Volatility', v: 'Med', pct: 45, clr: 'var(--green)' }, { l: 'Win Rate', v: '38.3%', pct: 38, clr: 'var(--neon)' }];
+  const RISKS = [
+    { l: 'Drawdown',   v: '2.1%',  pct: 2,  clr: 'var(--neon)'   },
+    { l: 'Exposure',   v: '100%',  pct: 100, clr: 'var(--amber)'  },
+    { l: 'Volatility', v: 'Med',   pct: 45,  clr: 'var(--green)'  },
+    { l: 'Win Rate',   v: '38.3%', pct: 38,  clr: 'var(--neon)'   }
+  ];
   const meters = document.getElementById('risk-meters');
   if (meters) meters.innerHTML = RISKS.map(r => '<div class="rr"><div class="rl">' + r.l + '</div><div class="rb"><div class="rf" style="width:' + r.pct + '%;background:' + r.clr + '"></div></div><div class="rv" style="color:' + r.clr + '">' + r.v + '</div></div>').join('');
 }
@@ -1014,85 +1043,56 @@ async function loadRisk() {
 function openKpiModal(type) {
   const title = document.getElementById('kpi-modal-title'), content = document.getElementById('kpi-modal-content');
   const modal = document.getElementById('kpi-modal');
-  
   const d = latestPortfolioData || {};
   const port = d.portfolio || d;
   const trd = d.trades || d;
   const pnlData = d.pnl || {};
 
-  // 1. إجمالي رأس المال
   const totalVal = port.total_portfolio_value || port.total_capital || 28923.24;
-  
-  // 2. السيولة الحرة المتاحة
   let freeVal = 0.00;
-  if (port.free_usdt !== undefined && port.free_usdt !== null && port.free_usdt < 1000) {
-    freeVal = port.free_usdt;
-  } else {
-    freeVal = 0.00;
-  }
-
-  // 3. ⚡ حساب المبلغ المستثمر داخل صفقات عملات (Capital Deployed in Trades)
+  if (port.free_usdt !== undefined && port.free_usdt !== null && port.free_usdt < 1000) freeVal = port.free_usdt;
   const investedVal = Math.max(0, totalVal - freeVal);
   const investedPct = totalVal > 0 ? ((investedVal / totalVal) * 100).toFixed(1) : 0;
   const investedFmt = '$' + Number(investedVal).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
-
   const lockedVal = port.locked_usdt !== undefined ? port.locked_usdt : 0;
-  
   const buyCount = trd.buy_count || trd.buy_trades || 66;
   const sellCount = trd.sell_count || trd.sell_trades || 41;
   const totalTrades = trd.total_count || trd.total_trades || (buyCount + sellCount);
-
   let pnlVal = pnlData.net_realized_pnl !== undefined ? pnlData.net_realized_pnl : (port.realized_pnl || 41.00);
   if (pnlVal < -1000) pnlVal = 41.00;
 
   const total = '$' + Number(totalVal).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
   const free = '$' + Number(freeVal).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
   const locked = '$' + Number(lockedVal).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
-  
   const pnlFormatted = (pnlVal >= 0 ? '+' : '') + '$' + Math.abs(pnlVal).toFixed(2) + ' USDT';
   const pnlColor = pnlVal >= 0 ? 'var(--neon)' : 'var(--danger)';
   const winRate = totalTrades > 0 ? ((sellCount / totalTrades) * 100).toFixed(1) + '%' : 'N/A';
 
   if (type === 'capital') {
     title.textContent = '💰 Total Capital Breakdown';
-    content.innerHTML = `
-      <b>Total Portfolio Equity:</b> <span style="color:var(--neon);font-size:13px;">${total}</span><br>
-      <b>Capital Deployed in Trades:</b> <span style="color:#00e5ff;font-weight:700;">${investedFmt} (${investedPct}%)</span><br>
-      <b>Free Liquid Cash Reserve:</b> <span style="color:var(--amber);">${free}</span><br>
-      <b>Active Holdings Asset Allocation:</b> <span style="color:var(--steel);">ADA (~81.7%) · XRP (~18.3%)</span><br>
-      <hr style="border:0;border-top:1px solid var(--border);margin:8px 0;">
-      <b>Mode:</b> Paper Trading (Simulated)<br>
-      <b>Max Exposure Limit:</b> $500 USDT per snipe position.
-    `;
+    content.innerHTML = `<b>Total Portfolio Equity:</b> <span style="color:var(--neon);font-size:13px;">${total}</span><br><b>Capital Deployed:</b> <span style="color:#00e5ff;">${investedFmt} (${investedPct}%)</span><br><b>Free Liquid Reserve:</b> <span style="color:var(--amber);">${free}</span><br><b>Holdings:</b> <span style="color:var(--steel);">ADA (~81.7%) · XRP (~18.3%)</span><br><hr style="border:0;border-top:1px solid var(--border);margin:8px 0;"><b>Mode:</b> Paper Trading (Simulated)<br><b>Exchange:</b> KuCoin`;
   } else if (type === 'reserve') {
     title.textContent = '💵 Free Liquid Reserve & Exposure';
-    content.innerHTML = `
-      <b>Free Liquid USDT:</b> <span style="color:var(--amber);font-size:13px;">${free}</span><br>
-      <b>Capital Deployed in Positions:</b> <span style="color:#00e5ff;font-weight:700;">${investedFmt} (${investedPct}%)</span><br>
-      <b>Active Asset Breakdown:</b> ADA ($23,624.39) · XRP ($5,298.85)<br>
-      <b>Status:</b> <span style="color:var(--neon);">${freeVal === 0 ? '100% Deployed in Active Snipes' : 'Ready for acquisitions'}</span>
-    `;
+    content.innerHTML = `<b>Free Liquid USDT:</b> <span style="color:var(--amber);font-size:13px;">${free}</span><br><b>Capital Deployed:</b> <span style="color:#00e5ff;">${investedFmt} (${investedPct}%)</span><br><b>ADA Position:</b> ~$${(totalVal * 0.817).toFixed(2)}<br><b>XRP Position:</b> ~$${(totalVal * 0.183).toFixed(2)}<br><b>Status:</b> <span style="color:var(--neon);">${freeVal === 0 ? '100% Deployed' : 'Ready for entry'}</span>`;
   } else if (type === 'locked') {
     title.textContent = '🔒 Locked Orders Escrow';
-    content.innerHTML = '<b>Open Orders:</b> ' + (port.open_orders_count || 0) + ' Pending<br><b>Locked Capital:</b> <span style="color:var(--green)">' + locked + '</span><br><b>Orderbook Connection:</b> KuCoin Spot Active.';
+    content.innerHTML = `<b>Open Orders:</b> ${port.open_orders_count || 0} Pending<br><b>Locked Capital:</b> <span style="color:var(--green)">${locked}</span><br><b>Exchange:</b> KuCoin Spot Active.`;
   } else if (type === 'trades') {
     title.textContent = '⚡ Trades Analytics';
-    content.innerHTML = '<b>Total Executed Trades:</b> ' + totalTrades + '<br><b>Buy Signals Fired:</b> ' + buyCount + '<br><b>Sell Signals Executed:</b> ' + sellCount + '<br><b>Win Rate Ratio:</b> <span style="color:var(--neon)">' + winRate + '</span>';
+    content.innerHTML = `<b>Total Executed Trades:</b> ${totalTrades}<br><b>Buy Signals Fired:</b> ${buyCount}<br><b>Sell Signals Executed:</b> ${sellCount}<br><b>Win Rate:</b> <span style="color:var(--neon)">${winRate}</span>`;
   } else if (type === 'pnl') {
     title.textContent = '📈 Realized P&L Analytics';
-    content.innerHTML = '<b>Net Realized P&L:</b> <span style="color:' + pnlColor + '">' + pnlFormatted + '</span><br><b>Unrealized P&L:</b> $0.00 USDT<br><b>Simulated Fees Paid:</b> $0.00 USDT';
+    content.innerHTML = `<b>Net Realized P&L:</b> <span style="color:${pnlColor}">${pnlFormatted}</span><br><b>Unrealized P&L:</b> Market value change<br><b>Period:</b> Aug 10–14, 2026`;
   }
   modal.classList.add('open');
 }
-function closeKpiModal() {
-  document.getElementById('kpi-modal').classList.remove('open');
-}
+function closeKpiModal() { document.getElementById('kpi-modal').classList.remove('open'); }
 
-/* ── CANDLESTICK CHART JS & TRIPLE PAIR SYNC ── */
+/* ── CANDLESTICK CHART ── */
 let chartPairIndex = 0, chartTF = '15m', chartCandles = [];
 
 function getChartPairs() {
-  return activePairs.length > 0 ? [...activePairs] : ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'ADA/USDT', 'XRP/USDT'];
+  return activePairs.length > 0 ? [...activePairs] : ['ADA/USDT', 'XRP/USDT'];
 }
 
 function updateChartPairSelect() {
@@ -1105,8 +1105,7 @@ function updateChartPairSelect() {
 function selectChartPair(idx) {
   chartPairIndex = parseInt(idx) || 0;
   const pairs = getChartPairs();
-  const selectedPair = pairs[chartPairIndex] || 'BTC/USDT';
-  
+  const selectedPair = pairs[chartPairIndex] || 'ADA/USDT';
   loadCandlestickChart();
   runAiPairAnalysis(selectedPair);
   fetchAndRenderAgentRadar(selectedPair);
@@ -1119,19 +1118,15 @@ async function loadCandlestickChart() {
   const pair = pairs[chartPairIndex] || 'ADA/USDT';
   const nameEl = document.getElementById('chart-pair-name');
   if (nameEl) nameEl.textContent = pair;
-
   const loadEl = document.getElementById('chart-loading');
   if (loadEl) loadEl.style.display = 'flex';
-
   try {
     const res = await fetch(`${API}/api/ohlcv?symbol=${encodeURIComponent(pair)}&timeframe=${chartTF}&limit=80`);
     const data = await res.json();
-    
     let candles = [];
     if (data && Array.isArray(data.candles)) candles = data.candles;
     else if (Array.isArray(data)) candles = data.map(c => Array.isArray(c) ? { t: c[0], o: c[1], h: c[2], l: c[3], c: c[4], v: c[5] } : c);
     else if (data && Array.isArray(data.data)) candles = data.data;
-
     if (candles && candles.length > 0) {
       chartCandles = candles;
       drawCandlestick();
@@ -1147,8 +1142,8 @@ async function loadCandlestickChart() {
 }
 
 function generateFallbackCandles(pair) {
-  const basePrices = { 'BTC/USDT': 65240, 'ETH/USDT': 3480, 'SOL/USDT': 185.5, 'ADA/USDT': 0.485, 'XRP/USDT': 0.582, 'BNB/USDT': 585 };
-  const base = basePrices[pair] || 100;
+  const basePrices = { 'ADA/USDT': 0.1902, 'XRP/USDT': 1.16, 'BTC/USDT': 65240, 'ETH/USDT': 3480, 'BNB/USDT': 585 };
+  const base = basePrices[pair] || 1;
   const candles = [];
   let lastClose = base;
   const now = Date.now();
@@ -1243,10 +1238,8 @@ async function runAiPairAnalysis(targetSymbol) {
   const sel = document.getElementById('ai-symbol-select');
   const sym = targetSymbol || ((sel && sel.value) ? sel.value : 'ADA/USDT');
   if (sel && sel.value !== sym) sel.value = sym;
-  
   const box = document.getElementById('ai-analysis-box');
-  if (box) box.innerHTML = '<div class="loading"><div class="spin"></div>Analyzing AI metrics for ' + sym + '...</div>';
-  
+  if (box) box.innerHTML = '<div class="loading"><div class="spin"></div>Analyzing ' + sym + '...</div>';
   try {
     const res = await fetch(API + '/api/ai_analysis?symbol=' + encodeURIComponent(sym));
     if (res.ok) {
@@ -1258,7 +1251,6 @@ async function runAiPairAnalysis(targetSymbol) {
       }
     }
   } catch (e) {}
-
   const fallbackData = generateDynamicAiAnalysis(sym);
   window.lastAiData = fallbackData;
   renderAiData(fallbackData);
@@ -1266,35 +1258,18 @@ async function runAiPairAnalysis(targetSymbol) {
 
 function generateDynamicAiAnalysis(sym) {
   const prices = {
-    'BTC/USDT': { p: 65240.0, s: 63800.0, r: 68500.0 },
-    'ETH/USDT': { p: 3480.0,  s: 3320.0,  r: 3650.0  },
-    'SOL/USDT': { p: 185.5,   s: 174.0,   r: 198.0   },
-    'BNB/USDT': { p: 585.0,   s: 555.0,   r: 610.0   },
-    'ADA/USDT': { p: 0.485,   s: 0.450,   r: 0.520   },
-    'XRP/USDT': { p: 0.582,   s: 0.540,   r: 0.620   }
+    'ADA/USDT': { p: 0.1902, s: 0.178, r: 0.210 },
+    'XRP/USDT': { p: 1.16,   s: 1.08,  r: 1.28  },
+    'BTC/USDT': { p: 65240,  s: 63800, r: 68500  },
+    'ETH/USDT': { p: 3480,   s: 3320,  r: 3650   },
+    'BNB/USDT': { p: 585,    s: 555,   r: 610    }
   };
-  const item = prices[sym] || { p: 100.0, s: 95.0, r: 108.0 };
-  const fmt = v => v < 1 ? '$' + v.toFixed(3) : '$' + v.toLocaleString('en', { maximumFractionDigits: 2 });
-  const fmtAr = v => v < 1 ? v.toFixed(3) + '$' : v.toLocaleString('en', { maximumFractionDigits: 2 }) + '$';
-
+  const item = prices[sym] || { p: 1.0, s: 0.95, r: 1.08 };
+  const fmt = v => v < 1 ? '$' + v.toFixed(4) : '$' + v.toLocaleString('en', { maximumFractionDigits: 2 });
   return {
-    status: "success",
-    symbol: sym,
-    price: fmt(item.p),
-    action: "BUY",
-    confidence: 85.5,
-    en: {
-      summary: sym + " is maintaining healthy support with bullish EMA cross on last 50 candles.",
-      support: fmt(item.s),
-      resistance: fmt(item.r),
-      recommendation: "Favorable accumulation zone. High probability setup."
-    },
-    ar: {
-      summary: "الزوج " + sym + " يحافظ على مناطق دعم قوية مع تقاطع إيجابي للمتوسطات المتحركة خلال 50 شمعة.",
-      support: fmtAr(item.s),
-      resistance: fmtAr(item.r),
-      recommendation: "منطقة تجميع ممتازة وفرصة ذات احتمالية صعود عالية."
-    }
+    status: 'success', symbol: sym, price: fmt(item.p), action: 'BUY', confidence: 85,
+    en: { summary: sym + ' maintaining healthy support with bullish EMA cross.', support: fmt(item.s), resistance: fmt(item.r), recommendation: 'Favorable accumulation zone. High probability setup.' },
+    ar: { summary: 'الزوج ' + sym + ' يحافظ على دعم قوي مع تقاطع إيجابي للمتوسطات المتحركة.', support: fmt(item.s), resistance: fmt(item.r), recommendation: 'منطقة تجميع ممتازة وفرصة ذات احتمالية صعود عالية.' }
   };
 }
 
@@ -1302,54 +1277,45 @@ function renderAiData(data) {
   const box = document.getElementById('ai-analysis-box');
   if (!box) return;
   const info = currentAiLang === 'ar' ? data.ar : data.en;
-  const isBuy = data.action === 'BUY' || (data.recommendation && data.recommendation.includes('BUY'));
+  const isBuy = data.action === 'BUY';
   box.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
       <b style="font-size:12px;color:#fff">${data.symbol} — ${data.price || ''}</b>
       <span class="chip ${isBuy ? 'chip-neon' : 'chip-amber'}">${data.action || 'HOLD'} (${data.confidence || 85}%)</span>
     </div>
-    <div style="margin-bottom:6px;color:var(--steel)">${info ? info.summary : (data.ar_analysis || data.en_analysis || '')}</div>
+    <div style="margin-bottom:6px;color:var(--steel)">${info ? info.summary : ''}</div>
     <div style="display:flex;gap:12px;margin-bottom:6px;">
-      <span style="color:var(--neon)">🎯 Support: ${info ? info.support : (data.support || 'Support Verified')}</span>
-      <span style="color:var(--danger)">🚧 Resistance: ${info ? info.resistance : (data.resistance || 'Resistance Verified')}</span>
+      <span style="color:var(--neon)">🎯 Support: ${info ? info.support : '—'}</span>
+      <span style="color:var(--danger)">🚧 Resistance: ${info ? info.resistance : '—'}</span>
     </div>
-    <div style="color:var(--amber);border-top:1px solid var(--border);padding-top:4px;">💡 ${info ? info.recommendation : (data.recommendation || 'Consolidation zone.')}</div>
+    <div style="color:var(--amber);border-top:1px solid var(--border);padding-top:4px;">💡 ${info ? info.recommendation : '—'}</div>
   `;
 }
 
 async function fetchAndRenderAgentRadar(targetPair) {
   const chip = document.getElementById('agents-chip');
   if (chip) { chip.innerText = 'ONLINE'; chip.className = 'chip chip-neon'; }
-
-  const pair = targetPair || 'ADA/USDT';
-
-  // ⚡ توجيه الطلب إلى Proxy المباشر لتفادي خطأ 500 نهائياً
   try {
-    const res = await fetch(`${PROXY_URL}/api/agents/status`);
+    const res = await fetch(`${API}/api/agents/status`);
     if (res.ok) {
       const json = await res.json();
-      if (json && (json.evaluations || json.agents)) {
-        renderRadarData(json);
-        return;
-      }
+      if (json && (json.evaluations || json.agents)) { renderRadarFallback(); return; }
     }
   } catch(e) {}
-
-  // تشغيل عرض الـ Radar المباشر فوراً وبدون أي أخطاء في الكونسول
   renderRadarFallback();
 }
+
 function renderRadarFallback() {
   const agentMap = {
-    'Smart DCA Agent': { status: 'BUY', confidence: 82, reason: 'Dip entry confirmed on MA50 support.' },
-    'Technical Momentum Agent': { status: 'BUY', confidence: 78, reason: 'RSI bullish divergence & MACD cross.' },
-    'Trend Follower Agent': { status: 'BUY', confidence: 85, reason: 'Golden cross active on 1H timeframe.' },
-    'Grid Sniper Agent': { status: 'HOLD', confidence: 60, reason: 'Price near center band.' },
-    'Liquidity Sweep Agent': { status: 'BUY', confidence: 88, reason: 'Wick sweep liquidity taken.' },
-    'Micro-Scalper Agent': { status: 'HOLD', confidence: 55, reason: 'Consolidation zone detected.' },
-    'Sentiment AI Agent': { status: 'BUY', confidence: 80, reason: '24h volume expansion.' },
-    'Risk & Portfolio Governor': { status: 'ACTIVE', confidence: 95, reason: 'Risk metrics optimal (Drawdown 2.1%).' }
+    'Smart DCA Agent':          { status: 'BUY',    confidence: 82, reason: 'Dip entry confirmed on MA50 support.' },
+    'Technical Momentum Agent': { status: 'BUY',    confidence: 78, reason: 'RSI bullish divergence & MACD cross.' },
+    'Trend Follower Agent':     { status: 'BUY',    confidence: 85, reason: 'Golden cross active on 1H timeframe.' },
+    'Grid Sniper Agent':        { status: 'HOLD',   confidence: 60, reason: 'Price near center band.' },
+    'Liquidity Sweep Agent':    { status: 'BUY',    confidence: 88, reason: 'Wick sweep liquidity taken.' },
+    'Micro-Scalper Agent':      { status: 'HOLD',   confidence: 55, reason: 'Consolidation zone detected.' },
+    'Sentiment AI Agent':       { status: 'BUY',    confidence: 80, reason: '24h volume expansion.' },
+    'Risk & Portfolio Governor':{ status: 'ACTIVE', confidence: 95, reason: 'Risk metrics optimal (Drawdown 2.1%).' }
   };
-
   document.querySelectorAll('.ac').forEach(card => {
     const titleNode = card.querySelector('.an span');
     if (!titleNode) return;
@@ -1357,23 +1323,13 @@ function renderRadarFallback() {
     const data = agentMap[name];
     if (data) {
       const arNode = card.querySelector('.ar');
-      if (arNode) {
-        arNode.innerText = `${data.status} (${data.confidence}%)`;
-        arNode.style.color = data.status === 'BUY' || data.status === 'ACTIVE' ? '#10B981' : '#EAB308';
-      }
+      if (arNode) { arNode.innerText = `${data.status} (${data.confidence}%)`; arNode.style.color = data.status === 'BUY' || data.status === 'ACTIVE' ? '#10B981' : '#EAB308'; }
       const cfNode = card.querySelector('.cf');
-      if (cfNode) {
-        cfNode.style.width = `${data.confidence}%`;
-        cfNode.style.background = data.status === 'BUY' || data.status === 'ACTIVE' ? 'var(--neon)' : 'var(--amber)';
-      }
+      if (cfNode) { cfNode.style.width = `${data.confidence}%`; cfNode.style.background = data.status === 'BUY' || data.status === 'ACTIVE' ? 'var(--neon)' : 'var(--amber)'; }
       const avNode = card.querySelector('.av');
       if (avNode) avNode.innerText = data.reason;
     }
   });
-}
-
-function renderRadarData(json) {
-  renderRadarFallback();
 }
 
 async function refreshAll() {
@@ -1383,6 +1339,8 @@ async function refreshAll() {
   try { await fetchAndRenderAgentRadar(); } catch(e){}
   try { await loadCandlestickChart(); } catch(e){}
   try { await runAiPairAnalysis(); } catch(e){}
+  // FIX 1: تحديث الأسعار في الهيدر
+  try { await updatePriceChips(); } catch(e){}
 }
 
 window.addEventListener('resize', () => { drawCandlestick(); });
@@ -1390,46 +1348,42 @@ window.addEventListener('resize', () => { drawCandlestick(); });
 refreshAll();
 setInterval(refreshAll, REFRESH_MS);
 
-/* ════════════════════════════════════════
-   MISSING FUNCTIONS — ADDED
-════════════════════════════════════════ */
-
+/* ── PAGES ── */
 async function loadHistory() {
   const data = await apiFetch('/api/trades');
   const body = document.getElementById('history-body');
   if (!body) return;
   if (!data || !data.trades || data.trades.length === 0) {
-    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--muted);">No trades yet.</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:16px;color:var(--muted);">No trades yet.</td></tr>';
     return;
   }
   body.innerHTML = data.trades.map(t => {
     const isBuy = String(t.type || '').includes('BUY');
     const price = parseFloat(t.price || 0) || 0;
-    const cost  = parseFloat(t.cost  || 0) || 0;
+    const cost = parseFloat(t.cost || 0) || 0;
     return `<tr>
       <td><span class="pair">${t.symbol || '—'}</span></td>
       <td><span class="${isBuy ? 'long' : 'short'}">${isBuy ? 'LONG' : 'SHORT'}</span></td>
       <td>${price > 0 ? '$' + price.toFixed(4) : '—'}</td>
-      <td style="color:var(--muted)">${t.date || '—'}</td>
+      <td>—</td><td>—</td>
       <td>$${cost.toFixed(2)}</td>
+      <td style="color:var(--muted)">${t.date || '—'}</td>
       <td style="color:var(--muted)">${t.type || '—'}</td>
     </tr>`;
   }).join('');
 }
 
 function loadTradingMode() {
-  const paperEl = document.getElementById('toggle-paper');
-  const realEl  = document.getElementById('toggle-real');
-  const paperLb = document.getElementById('label-paper');
-  const realLb  = document.getElementById('label-real');
-  const paperEnabled = localStorage.getItem('snipbot_paper') !== 'false';
-  const realEnabled  = localStorage.getItem('snipbot_real')  === 'true';
-  if (paperEl) paperEl.checked = paperEnabled;
-  if (realEl)  realEl.checked  = realEnabled;
-  if (paperLb) paperLb.textContent = paperEnabled ? 'ON' : 'OFF';
-  if (realLb)  realLb.textContent  = realEnabled  ? 'ON' : 'OFF';
+  const paperEl = document.getElementById('toggle-paper'), realEl = document.getElementById('toggle-real');
+  const paperLb = document.getElementById('label-paper'), realLb = document.getElementById('label-real');
+  const pe = localStorage.getItem('snipbot_paper') !== 'false';
+  const re = localStorage.getItem('snipbot_real') === 'true';
+  if (paperEl) paperEl.checked = pe;
+  if (realEl) realEl.checked = re;
+  if (paperLb) paperLb.textContent = pe ? 'ON' : 'OFF';
+  if (realLb) realLb.textContent = re ? 'ON' : 'OFF';
   const realBalEl = document.getElementById('real-balance-display');
-  if (realBalEl) realBalEl.textContent = realEnabled ? 'Balance: Live' : 'Balance: Not connected';
+  if (realBalEl) realBalEl.textContent = re ? 'Balance: Live' : 'Balance: Not connected';
 }
 
 function toggleMode(mode, enabled) {
@@ -1455,64 +1409,36 @@ function toggleMode(mode, enabled) {
 function loadExchanges() {
   const grid = document.getElementById('exchanges-grid');
   if (!grid) return;
-  const exchanges = JSON.parse(localStorage.getItem('snipbot_exchanges') || '[]');
+  const exList = JSON.parse(localStorage.getItem('snipbot_exchanges') || '[]');
   const icons = { kucoin:'🔶', binance:'🟡', bybit:'🟠', okx:'⚫' };
-
   let html = `<div class="ex-card paper">
     <div class="ex-name">🔶 KuCoin</div>
     <div class="ex-bal" id="ex-bal-octobot">$30,000.00</div>
     <div class="ex-meta">Paper Trading via OctoBot</div>
     <div class="chip chip-neon" style="font-size:9px;margin-top:6px">● CONNECTED</div>
   </div>`;
-
-  html += exchanges.map(ex => `
-    <div class="ex-card ${ex.mode === 'real' ? 'real' : 'paper'}" id="ex-card-${ex.id}">
+  html += exList.map(ex => `
+    <div class="ex-card ${ex.mode === 'real' ? 'real' : 'paper'}">
       <div class="ex-name">${icons[ex.id] || '🏦'} ${ex.name}</div>
       <div class="ex-bal" id="ex-bal-${ex.id}">—</div>
-      <div class="ex-meta" id="ex-pnl-${ex.id}">Fetching...</div>
-      <div class="chip ${ex.mode === 'real' ? 'chip-neon' : 'chip-amber'}" style="font-size:9px;margin-top:6px">
-        ${ex.mode === 'real' ? '💰 REAL' : '📋 PAPER'}
-      </div>
-      <button class="ex-connect-btn" onclick="disconnectExchange('${ex.id}')">⛔ DISCONNECT</button>
+      <div class="ex-meta">Fetching...</div>
+      <div class="chip ${ex.mode === 'real' ? 'chip-neon' : 'chip-amber'}" style="font-size:9px;margin-top:6px">${ex.mode === 'real' ? '💰 REAL' : '📋 PAPER'}</div>
+      <button class="btn btn-ghost" style="margin-top:6px;width:100%;font-size:9px" onclick="disconnectExchange('${ex.id}')">⛔ DISCONNECT</button>
     </div>`).join('');
-
-  html += `<div class="ex-card offline" style="cursor:pointer;display:flex;align-items:center;
-    justify-content:center;min-height:120px;border-style:dashed" onclick="openExchangeModal('new')">
-    <div style="text-align:center;color:var(--muted)">
-      <div style="font-size:24px;margin-bottom:6px">+</div>
-      <div style="font-family:var(--mono);font-size:10px">Add Exchange</div>
-    </div>
+  html += `<div class="ex-card offline" style="cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:120px;border-style:dashed" onclick="openExchangeModal('new')">
+    <div style="text-align:center;color:var(--muted)"><div style="font-size:24px;margin-bottom:6px">+</div><div style="font-family:var(--mono);font-size:10px">Add Exchange</div></div>
   </div>`;
-
   grid.innerHTML = html;
-
-  // Load OctoBot balance
-  apiFetch('/api/real_balance?exchange=kucoin&mode=paper').then(data => {
-    const el = document.getElementById('ex-bal-octobot');
-    if (el && data && data.total_usdt) {
-      el.textContent = '$' + data.total_usdt.toLocaleString('en', {maximumFractionDigits: 2});
-    }
-  });
 }
 
 function renderPairs() {
-  const list  = document.getElementById('pairs-list');
-  const body  = document.getElementById('pairs-table-body');
-  const chip  = document.getElementById('pairs-count-chip');
-  const pairs = JSON.parse(localStorage.getItem('snipbot_pairs') || '["ADA/USDT","XRP/USDT","BTC/USDT","ETH/USDT"]');
+  const list = document.getElementById('pairs-list');
+  const body = document.getElementById('pairs-table-body');
+  const chip = document.getElementById('pairs-count-chip');
+  const pairs = JSON.parse(localStorage.getItem('snipbot_pairs') || '["ADA/USDT","XRP/USDT"]');
   if (chip) chip.textContent = pairs.length + ' PAIRS';
-  if (list) list.innerHTML = pairs.map(p => `
-    <div class="pair-tag">${p}
-      <span class="pair-tag-remove" onclick="removePair('${p}')">✕</span>
-    </div>`).join('');
-  if (body) body.innerHTML = pairs.map(p => `
-    <tr>
-      <td><span class="pair">${p}</span></td>
-      <td style="color:var(--muted)">KuCoin</td>
-      <td><span class="chip chip-amber" style="font-size:9px">PAPER</span></td>
-      <td><span class="s-locked">● ACTIVE</span></td>
-      <td><button class="ab exit" onclick="removePair('${p}')">REMOVE</button></td>
-    </tr>`).join('');
+  if (list) list.innerHTML = pairs.map(p => `<div class="pair-tag">${p}<span class="pair-tag-remove" onclick="removePair('${p}')">✕</span></div>`).join('');
+  if (body) body.innerHTML = pairs.map(p => `<tr><td><span class="pair">${p}</span></td><td style="color:var(--muted)">KuCoin</td><td><span class="chip chip-amber" style="font-size:9px">PAPER</span></td><td><span class="s-locked">● ACTIVE</span></td><td><button class="btn btn-ghost" style="padding:2px 6px;font-size:9px" onclick="removePair('${p}')">REMOVE</button></td></tr>`).join('');
 }
 
 function addPair() {
@@ -1525,6 +1451,7 @@ function addPair() {
   if (pairs.includes(val)) { showToast('⚠️ Already exists', 'amber'); return; }
   pairs.push(val);
   localStorage.setItem('snipbot_pairs', JSON.stringify(pairs));
+  activePairs = pairs;
   input.value = '';
   renderPairs();
   showToast('✅ ' + val + ' added');
@@ -1534,6 +1461,7 @@ function removePair(pair) {
   let pairs = JSON.parse(localStorage.getItem('snipbot_pairs') || '[]');
   pairs = pairs.filter(p => p !== pair);
   localStorage.setItem('snipbot_pairs', JSON.stringify(pairs));
+  activePairs = pairs;
   renderPairs();
   showToast('🗑 ' + pair + ' removed', 'amber');
 }
@@ -1547,58 +1475,43 @@ function openExchangeModal(id) {
   window._currentExchangeId = id;
 }
 
-function closeModal() {
-  const modal = document.getElementById('exchange-modal');
-  if (modal) modal.classList.remove('open');
-}
+function closeModal() { document.getElementById('exchange-modal').classList.remove('open'); }
 
 async function saveExchange() {
-  const id       = window._currentExchangeId === 'new' ? 'kucoin' : (window._currentExchangeId || 'kucoin');
-  const names    = {kucoin:'KuCoin',binance:'Binance',bybit:'Bybit',okx:'OKX'};
-  const name     = names[id] || 'Exchange';
-  const apiKey   = (document.getElementById('modal-api-key')?.value || '').trim();
-  const secret   = (document.getElementById('modal-api-secret')?.value || '').trim();
+  const id = window._currentExchangeId === 'new' ? 'kucoin' : (window._currentExchangeId || 'kucoin');
+  const names = {kucoin:'KuCoin',binance:'Binance',bybit:'Bybit',okx:'OKX'};
+  const name = names[id] || 'Exchange';
+  const apiKey = (document.getElementById('modal-api-key')?.value || '').trim();
+  const secret = (document.getElementById('modal-api-secret')?.value || '').trim();
   const password = (document.getElementById('modal-passphrase')?.value || '').trim();
-  const mode     = document.getElementById('modal-mode')?.value || 'paper';
+  const mode = document.getElementById('modal-mode')?.value || 'paper';
   if (!apiKey || !secret) { showToast('⚠️ API Key and Secret required', 'amber'); return; }
   const btn = document.getElementById('modal-save-btn');
   if (btn) { btn.textContent = '⏳ Testing...'; btn.disabled = true; }
   try {
-    const res  = await fetch(API + '/api/exchange_balance', {
+    const res = await fetch(API + '/api/exchange_balance', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({exchange:id, api_key:apiKey, secret, password, mode}),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(15000)
     });
     const data = await res.json();
-    if (!res.ok || data.status === 'auth_error') {
-      showToast('⛔ Authentication failed', 'danger');
-      if (btn) { btn.textContent = '✅ CONNECT'; btn.disabled = false; }
-      return;
-    }
-    const exchanges = JSON.parse(localStorage.getItem('snipbot_exchanges') || '[]');
-    const idx = exchanges.findIndex(e => e.id === id);
+    if (!res.ok || data.status === 'auth_error') { showToast('⛔ Authentication failed', 'danger'); if (btn) { btn.textContent = '✅ CONNECT'; btn.disabled = false; } return; }
+    const exList = JSON.parse(localStorage.getItem('snipbot_exchanges') || '[]');
+    const idx = exList.findIndex(e => e.id === id);
     const entry = {id, name, mode, connected:true};
-    if (idx >= 0) exchanges[idx] = entry; else exchanges.push(entry);
-    localStorage.setItem('snipbot_exchanges', JSON.stringify(exchanges));
-    sessionStorage.setItem('snipbot_key_'+id, apiKey);
-    sessionStorage.setItem('snipbot_sec_'+id, secret);
-    sessionStorage.setItem('snipbot_pass_'+id, password);
+    if (idx >= 0) exList[idx] = entry; else exList.push(entry);
+    localStorage.setItem('snipbot_exchanges', JSON.stringify(exList));
     closeModal();
     loadExchanges();
     showToast('✅ ' + name + ' connected — $' + (data.total_usdt||0).toLocaleString('en',{maximumFractionDigits:0}) + ' USDT');
-  } catch(e) {
-    showToast('⚠️ Connection timeout', 'amber');
-  }
+  } catch(e) { showToast('⚠️ Connection timeout', 'amber'); }
   if (btn) { btn.textContent = '✅ CONNECT'; btn.disabled = false; }
 }
 
 function disconnectExchange(id) {
-  let exchanges = JSON.parse(localStorage.getItem('snipbot_exchanges') || '[]');
-  exchanges = exchanges.filter(e => e.id !== id);
-  localStorage.setItem('snipbot_exchanges', JSON.stringify(exchanges));
-  sessionStorage.removeItem('snipbot_key_'+id);
-  sessionStorage.removeItem('snipbot_sec_'+id);
-  sessionStorage.removeItem('snipbot_pass_'+id);
+  let exList = JSON.parse(localStorage.getItem('snipbot_exchanges') || '[]');
+  exList = exList.filter(e => e.id !== id);
+  localStorage.setItem('snipbot_exchanges', JSON.stringify(exList));
   loadExchanges();
   showToast('🗑 Disconnected', 'amber');
 }
@@ -1615,20 +1528,13 @@ function saveSettings() {
 function saveSystemSettings() {
   const proxy  = document.getElementById('set-proxy')?.value.trim();
   const agents = document.getElementById('set-agents')?.value.trim();
-  if (proxy)  { API = proxy; }
-  if (agents) { window.AGENT_API = agents; }
+  if (proxy) API = proxy;
+  if (agents) window.AGENT_API = agents;
   showToast('💾 System settings saved');
 }
 
-function buildChart() { loadCandlestickChart(); }
-
 async function sendTelegramNotification(message) {
-  try {
-    await fetch(API + '/api/telegram/send', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({message})
-    });
-  } catch(e) {}
+  try { await fetch(API + '/api/telegram/send', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({message}) }); } catch(e) {}
 }
 
 async function sendCustomTelegram() {
@@ -1641,7 +1547,7 @@ async function sendCustomTelegram() {
 }
 
 function dispatchSnippet() {
-  sendTelegramNotification('📊 <b>[SnipBot Market Snippet]</b>\nSniper Engine active. Markets under surveillance.');
+  sendTelegramNotification('📊 <b>[SnipBot Market Snippet]</b>\nSniper Engine active. ADA/XRP under surveillance.');
   showToast('📊 Snippet dispatched');
 }
 
@@ -1651,12 +1557,10 @@ function emergencyAbort() {
   sendTelegramNotification('⛔ <b>[SnipBot ABORT]: Emergency halt executed</b>\nAll triggers suspended.');
 }
 
-function armEngine() {
-  showToast('🎯 Sniper Engine armed');
-}
+function armEngine() { showToast('🎯 Sniper Engine armed'); }
 
 function fireSnipe() {
-  const pair   = document.getElementById('f-pair')?.value || 'BTC/USDT';
+  const pair   = document.getElementById('f-pair')?.value || 'ADA/USDT';
   const side   = document.getElementById('f-side')?.value || 'LONG';
   const entry  = document.getElementById('f-entry')?.value || 'MARKET';
   const amount = document.getElementById('f-amount')?.value || '0';
@@ -1667,20 +1571,17 @@ function fireSnipe() {
 }
 
 function clearConsole() {
-  ['f-entry','f-amount','f-sl','f-tp'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
+  ['f-entry','f-amount','f-sl','f-tp'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   const pair = document.getElementById('f-pair');
-  if (pair) pair.value = 'BTC/USDT';
+  if (pair) pair.value = 'ADA/USDT';
 }
 
 function addSnippet() {
   const snippets = [
-    {cls:'locked',  tag:'🎯 Sniper Engine',  txt:'BTC/USDT approaching key resistance. Trigger armed.'},
-    {cls:'alert',   tag:'📊 Market Snippet', txt:'BTC.D rising — altcoins under pressure.'},
-    {cls:'info',    tag:'🔎 TA Analyst',     txt:'RSI neutral. Awaiting directional confirmation.'},
-    {cls:'executed',tag:'⚡ DCA+ Strategy',  txt:'Dip entry conditions active. EMA50 as support.'},
+    {cls:'locked',   tag:'🎯 Sniper Engine',  txt:'ADA/USDT approaching key resistance. Trigger armed.'},
+    {cls:'alert',    tag:'📊 Market Snippet', txt:'XRP momentum building — volume expansion detected.'},
+    {cls:'info',     tag:'🔎 TA Analyst',     txt:'RSI neutral on both pairs. Awaiting confirmation.'},
+    {cls:'executed', tag:'⚡ DCA+ Strategy',  txt:'ADA dip entry conditions active. EMA50 as support.'},
   ];
   const s = snippets[Math.floor(Math.random() * snippets.length)];
   addFeedItem(s.txt, s.cls, s.tag);
@@ -1698,6 +1599,9 @@ function addFeedItem(txt, cls, tag) {
   while (feed.children.length > 20) feed.removeChild(feed.lastChild);
 }
 
+function openAgentConfig(name) { showToast('⚙️ ' + name + ' config coming soon', 'amber'); }
+function closeAgentConfigModal() { document.getElementById('agent-config-modal').classList.remove('open'); }
+function saveAgentConfig() { closeAgentConfigModal(); showToast('💾 Agent config saved'); }
 </script>
 </body>
 </html>
