@@ -1011,7 +1011,13 @@ let activePairs = JSON.parse(localStorage.getItem('snipbot_pairs') || '["ADA/USD
 let exchanges = JSON.parse(localStorage.getItem('snipbot_exchanges') || '[]');
 let currentAiLang = 'ar';
 let selectedAgentName = '';
+// ── الزوج المحفوظ دائماً ──
+let SELECTED_PAIR = localStorage.getItem('snipbot_selected_pair') || activePairs[0] || 'ADA/USDT';
 
+function setSelectedPair(pair) {
+  SELECTED_PAIR = pair;
+  localStorage.setItem('snipbot_selected_pair', pair);
+}
 setInterval(() => {
   const n = new Date();
   if (document.getElementById('topbar-clock')) document.getElementById('topbar-clock').textContent = n.toLocaleTimeString('en-GB');
@@ -1364,6 +1370,7 @@ function selectChartPair(idx) {
   chartPairIndex = parseInt(idx) || 0;
   const pairs = getChartPairs();
   const selectedPair = pairs[chartPairIndex] || 'ADA/USDT';
+  setSelectedPair(selectedPair);  // ← أضف هذا
   loadCandlestickChart();
   runAiPairAnalysis(selectedPair);
   fetchAndRenderAgentRadar(selectedPair);
@@ -1923,10 +1930,9 @@ async function refreshAll() {
   try { await loadPortfolio(); updateStartingCard(); } catch(e){}
   try { await loadTrades(); } catch(e){}
   try { await loadRisk(); } catch(e){}
-  try { await fetchAndRenderAgentRadar(); } catch(e){}
+  try { await fetchAndRenderAgentRadar(SELECTED_PAIR); } catch(e){} // ← أضف SELECTED_PAIR
   try { await loadCandlestickChart(); } catch(e){}
-  try { await runAiPairAnalysis(); } catch(e){}
-  // FIX 1: تحديث الأسعار في الهيدر
+  try { await runAiPairAnalysis(SELECTED_PAIR); } catch(e){} // ← أضف SELECTED_PAIR
   try { await updatePriceChips(); } catch(e){}
 }
 
