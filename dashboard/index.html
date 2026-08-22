@@ -2369,7 +2369,13 @@ function emergencyAbort() {
   sendTelegramNotification('⛔ <b>[SnipBot ABORT]: Emergency halt executed</b>\nAll triggers suspended.');
 }
 
-function armEngine() { showToast('🎯 Sniper Engine armed'); }
+function armEngine() {
+  const pair = document.getElementById('chart-pair-select')?.value || 
+               document.getElementById('f-pair')?.value || 
+               'ADA/USDT';
+  showToast('🎯 Sniper Engine armed — ' + pair);
+  fetchAndRenderAgentRadar(pair);
+}
 
 function fireSnipe() {
   const pair   = document.getElementById('f-pair')?.value || 'ADA/USDT';
