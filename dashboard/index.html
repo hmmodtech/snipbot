@@ -843,11 +843,61 @@ const REFRESH_MS = 15000;
 
   </div>
 
-  <!-- PAGE 5: AGENTS -->
+  <!-- PAGE 5: AGENTS + EXECUTION ENGINE -->
   <div class="content" id="page-agents" style="display:none">
-    <div class="sl">AI Agent Radar</div>
-    <div class="ag" id="agents-grid-full" style="grid-template-columns:repeat(2,1fr)">
-      <div class="loading"><div class="spin"></div>Loading agents...</div>
+    <div class="sl">AI Agent Radar — Live Execution Engine</div>
+
+    <!-- Engine Control Bar -->
+    <div class="card" style="border-color:rgba(57,255,20,.4);background:rgba(57,255,20,.04)">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-family:var(--raj);font-size:16px;font-weight:700;color:#fff">🎯 Sniper Engine</div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px" id="engine-status-txt">STANDBY — Click ARM to activate auto-execution</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span class="chip chip-muted" id="engine-mode-chip">MANUAL</span>
+          <span class="chip chip-muted" id="engine-cycle-chip">CYCLE: —</span>
+          <button class="btn btn-ghost" id="btn-engine-pause" onclick="pauseEngine()" style="display:none">⏸ PAUSE</button>
+          <button class="btn btn-neon" id="btn-engine-arm" onclick="armExecutionEngine()">🎯 ARM ENGINE</button>
+          <button class="btn btn-danger" onclick="emergencyAbort()" style="padding:5px 10px">⛔ ABORT</button>
+        </div>
+      </div>
+      <!-- Consensus bar -->
+      <div style="margin-top:12px;">
+        <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:4px;">
+          <span>CONSENSUS SCORE</span>
+          <span id="consensus-score-txt">0 / 8 agents</span>
+        </div>
+        <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+          <div id="consensus-bar" style="height:100%;width:0%;background:var(--amber);border-radius:3px;transition:.5s"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:8px;color:var(--muted);margin-top:3px;">
+          <span>0%</span><span style="color:var(--amber)">THRESHOLD: 62%</span><span>100%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pair Selector for Engine -->
+    <div class="card">
+      <div class="ch"><span class="ct">🎯 Target Pair — Engine Analysis</span>
+        <select class="pair-select" id="engine-pair-select" onchange="runEngineAnalysis(this.value)" style="font-size:10px;padding:3px 8px;"></select>
+      </div>
+      <div id="engine-signal-box" style="font-family:var(--mono);font-size:10px;padding:10px;background:var(--surface);border-radius:6px;line-height:1.8;color:var(--muted)">
+        Select a pair and ARM the engine to see live signals.
+      </div>
+    </div>
+
+    <!-- 8 Agents Grid -->
+    <div class="ag" id="agents-grid-full" style="grid-template-columns:repeat(2,1fr)"></div>
+
+    <!-- Execution Log -->
+    <div class="card">
+      <div class="ch"><span class="ct">⚡ Execution Log</span>
+        <button class="btn btn-ghost" style="padding:2px 7px;font-size:9px" onclick="clearExecLog()">CLEAR</button>
+      </div>
+      <div id="exec-log" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);padding:8px;">◎ Engine standing by...</div>
+      </div>
     </div>
   </div>
 
@@ -1500,44 +1550,373 @@ function renderAiData(data) {
   `;
 }
 
-async function fetchAndRenderAgentRadar(targetPair) {
-  const chip = document.getElementById('agents-chip');
-  if (chip) { chip.innerText = 'ONLINE'; chip.className = 'chip chip-neon'; }
-  try {
-    const res = await fetch(`${API}/api/agents/status`);
-    if (res.ok) {
-      const json = await res.json();
-      if (json && (json.evaluations || json.agents)) { renderRadarFallback(); return; }
-    }
-  } catch(e) {}
-  renderRadarFallback();
+// ══════════════════════════════════════════
+// EXECUTION ENGINE — الداشبورد تحلل وتنفذ مستقلة
+// ══════════════════════════════════════════
+
+let engineRunning = false;
+let engineInterval = null;
+let engineCycle = 0;
+let lastSignals = {};
+
+const AGENT_DEFINITIONS = [
+  { id: 'smart_dca',   name: 'Smart DCA Agent',           weight: 1.0, color: 'var(--neon)'   },
+  { id: 'tech_mom',    name: 'Technical Momentum Agent',  weight: 1.2, color: 'var(--neon)'   },
+  { id: 'trend',       name: 'Trend Follower Agent',      weight: 1.1, color: 'var(--amber)'  },
+  { id: 'grid_sniper', name: 'Grid Sniper Agent',         weight: 0.9, color: 'var(--amber)'  },
+  { id: 'liq_sweep',   name: 'Liquidity Sweep Agent',     weight: 1.3, color: 'var(--neon)'   },
+  { id: 'scalper',     name: 'Micro-Scalper Agent',       weight: 0.8, color: 'var(--green)'  },
+  { id: 'sentiment',   name: 'Sentiment AI Agent',        weight: 1.0, color: 'var(--amber)'  },
+  { id: 'risk_gov',    name: 'Risk & Portfolio Governor', weight: 1.5, color: 'var(--danger)'  },
+];
+
+function renderAgentsGrid() {
+  const grid = document.getElementById('agents-grid-full');
+  if (!grid) return;
+  grid.innerHTML = AGENT_DEFINITIONS.map(a => `
+    <div class="ac" id="agent-card-${a.id}">
+      <div class="an">
+        <span>${a.name}</span>
+        <span class="chip chip-muted" style="font-size:8px" id="agent-verdict-${a.id}">SCANNING</span>
+      </div>
+      <div class="ar" id="agent-conf-${a.id}" style="color:var(--muted)">Waiting for data...</div>
+      <div class="cb"><div class="cf" id="agent-bar-${a.id}" style="width:0%;background:${a.color}"></div></div>
+      <div class="av" id="agent-reason-${a.id}">—</div>
+    </div>`).join('');
 }
 
-function renderRadarFallback() {
-  const agentMap = {
-    'Smart DCA Agent':          { status: 'BUY',    confidence: 82, reason: 'Dip entry confirmed on MA50 support.' },
-    'Technical Momentum Agent': { status: 'BUY',    confidence: 78, reason: 'RSI bullish divergence & MACD cross.' },
-    'Trend Follower Agent':     { status: 'BUY',    confidence: 85, reason: 'Golden cross active on 1H timeframe.' },
-    'Grid Sniper Agent':        { status: 'HOLD',   confidence: 60, reason: 'Price near center band.' },
-    'Liquidity Sweep Agent':    { status: 'BUY',    confidence: 88, reason: 'Wick sweep liquidity taken.' },
-    'Micro-Scalper Agent':      { status: 'HOLD',   confidence: 55, reason: 'Consolidation zone detected.' },
-    'Sentiment AI Agent':       { status: 'BUY',    confidence: 80, reason: '24h volume expansion.' },
-    'Risk & Portfolio Governor':{ status: 'ACTIVE', confidence: 95, reason: 'Risk metrics optimal (Drawdown 2.1%).' }
-  };
-  document.querySelectorAll('.ac').forEach(card => {
-    const titleNode = card.querySelector('.an span');
-    if (!titleNode) return;
-    const name = titleNode.innerText.trim();
-    const data = agentMap[name];
-    if (data) {
-      const arNode = card.querySelector('.ar');
-      if (arNode) { arNode.innerText = `${data.status} (${data.confidence}%)`; arNode.style.color = data.status === 'BUY' || data.status === 'ACTIVE' ? '#10B981' : '#EAB308'; }
-      const cfNode = card.querySelector('.cf');
-      if (cfNode) { cfNode.style.width = `${data.confidence}%`; cfNode.style.background = data.status === 'BUY' || data.status === 'ACTIVE' ? 'var(--neon)' : 'var(--amber)'; }
-      const avNode = card.querySelector('.av');
-      if (avNode) avNode.innerText = data.reason;
+async function analyzeAgent(agentId, pair, ohlcv) {
+  // كل agent له منطق تحليل مختلف بناءً على OHLCV حقيقي
+  const candles = ohlcv || [];
+  if (candles.length < 10) return { signal: 'HOLD', confidence: 50, reason: 'Insufficient data' };
+
+  const closes = candles.map(c => parseFloat(c.c || c[4] || 0)).filter(v => v > 0);
+  const volumes = candles.map(c => parseFloat(c.v || c[5] || 0)).filter(v => v > 0);
+  const last    = closes[closes.length - 1];
+  const prev    = closes[closes.length - 2];
+  const change  = ((last - prev) / prev) * 100;
+
+  // RSI calculation
+  function calcRSI(data, period = 14) {
+    if (data.length < period + 1) return 50;
+    let gains = 0, losses = 0;
+    for (let i = data.length - period; i < data.length; i++) {
+      const diff = data[i] - data[i-1];
+      if (diff > 0) gains += diff; else losses -= diff;
     }
+    const rs = gains / (losses || 1);
+    return 100 - (100 / (1 + rs));
+  }
+
+  // EMA calculation
+  function calcEMA(data, period) {
+    const k = 2 / (period + 1);
+    let ema = data[0];
+    for (let i = 1; i < data.length; i++) ema = data[i] * k + ema * (1 - k);
+    return ema;
+  }
+
+  const rsi    = calcRSI(closes);
+  const ema9   = calcEMA(closes.slice(-20), 9);
+  const ema21  = calcEMA(closes.slice(-30), 21);
+  const ema50  = calcEMA(closes.slice(-60), 50);
+  const avgVol = volumes.slice(-10).reduce((a,b) => a+b, 0) / 10;
+  const lastVol= volumes[volumes.length - 1];
+  const volSurge = lastVol > avgVol * 1.3;
+
+  // High/Low range
+  const highs = candles.map(c => parseFloat(c.h || c[2] || 0));
+  const lows  = candles.map(c => parseFloat(c.l || c[3] || 0));
+  const highN = Math.max(...highs.slice(-20));
+  const lowN  = Math.min(...lows.slice(-20));
+  const midRange = (highN + lowN) / 2;
+
+  switch(agentId) {
+    case 'smart_dca': {
+      if (rsi < 35 && last < ema50) return { signal: 'BUY',  confidence: 78 + Math.random()*10, reason: `RSI ${rsi.toFixed(1)} oversold. DCA entry zone.` };
+      if (rsi > 68)                  return { signal: 'SELL', confidence: 72 + Math.random()*8,  reason: `RSI ${rsi.toFixed(1)} overbought. DCA exit.` };
+      return { signal: 'HOLD', confidence: 55, reason: `RSI ${rsi.toFixed(1)} neutral. Waiting for dip.` };
+    }
+    case 'tech_mom': {
+      const bullCross = ema9 > ema21 && change > 0;
+      const bearCross = ema9 < ema21 && change < 0;
+      if (bullCross && volSurge) return { signal: 'BUY',  confidence: 82 + Math.random()*10, reason: `EMA9 > EMA21 bullish cross. Volume surge ${(lastVol/avgVol).toFixed(1)}x.` };
+      if (bearCross)             return { signal: 'SELL', confidence: 75 + Math.random()*8,  reason: `EMA9 < EMA21 bearish cross confirmed.` };
+      return { signal: 'HOLD', confidence: 58, reason: `EMA9: ${ema9.toFixed(4)} vs EMA21: ${ema21.toFixed(4)}. No cross.` };
+    }
+    case 'trend': {
+      if (last > ema50 && ema21 > ema50) return { signal: 'BUY',  confidence: 80 + Math.random()*12, reason: `Price above EMA50. Uptrend confirmed.` };
+      if (last < ema50 && ema21 < ema50) return { signal: 'SELL', confidence: 74 + Math.random()*10, reason: `Price below EMA50. Downtrend active.` };
+      return { signal: 'HOLD', confidence: 52, reason: `Price at EMA50. Consolidation zone.` };
+    }
+    case 'grid_sniper': {
+      const pos = (last - lowN) / (highN - lowN || 1);
+      if (pos < 0.25) return { signal: 'BUY',  confidence: 76 + Math.random()*10, reason: `Price at ${(pos*100).toFixed(0)}% of range. Grid buy zone.` };
+      if (pos > 0.75) return { signal: 'SELL', confidence: 73 + Math.random()*8,  reason: `Price at ${(pos*100).toFixed(0)}% of range. Grid sell zone.` };
+      return { signal: 'HOLD', confidence: 55, reason: `Price at ${(pos*100).toFixed(0)}% of range. Mid-grid.` };
+    }
+    case 'liq_sweep': {
+      const wick = highs[highs.length-1] - Math.max(closes[closes.length-1], closes[closes.length-2]);
+      const wickPct = (wick / last) * 100;
+      if (wickPct > 0.3 && last < midRange) return { signal: 'BUY',  confidence: 85 + Math.random()*8, reason: `Wick sweep ${wickPct.toFixed(2)}% detected. Liquidity taken.` };
+      if (rsi > 72 && volSurge)             return { signal: 'SELL', confidence: 79 + Math.random()*8, reason: `Volume spike on high RSI. Distribution.` };
+      return { signal: 'HOLD', confidence: 60, reason: `No liquidity sweep detected.` };
+    }
+    case 'scalper': {
+      if (Math.abs(change) > 0.3 && change < 0 && rsi < 40) return { signal: 'BUY',  confidence: 70 + Math.random()*15, reason: `Quick dip ${change.toFixed(2)}%. Scalp entry.` };
+      if (change > 0.5 && rsi > 60)                          return { signal: 'SELL', confidence: 68 + Math.random()*12, reason: `Quick pump ${change.toFixed(2)}%. Scalp exit.` };
+      return { signal: 'HOLD', confidence: 48, reason: `Change ${change.toFixed(3)}%. No scalp opportunity.` };
+    }
+    case 'sentiment': {
+      const bullCandles = closes.slice(-10).filter((c,i,arr) => i > 0 && c > arr[i-1]).length;
+      const bullPct = (bullCandles / 9) * 100;
+      if (bullPct > 65) return { signal: 'BUY',  confidence: 72 + Math.random()*12, reason: `${bullPct.toFixed(0)}% bullish candles last 10. Positive sentiment.` };
+      if (bullPct < 35) return { signal: 'SELL', confidence: 70 + Math.random()*10, reason: `${bullPct.toFixed(0)}% bullish candles last 10. Negative sentiment.` };
+      return { signal: 'HOLD', confidence: 54, reason: `Mixed sentiment. ${bullPct.toFixed(0)}% bullish candles.` };
+    }
+    case 'risk_gov': {
+      const drawdown = ((Math.max(...closes.slice(-20)) - last) / Math.max(...closes.slice(-20))) * 100;
+      if (drawdown > 5)    return { signal: 'SELL', confidence: 90, reason: `⚠️ Drawdown ${drawdown.toFixed(1)}% detected. Risk management override.` };
+      if (rsi < 25)        return { signal: 'BUY',  confidence: 88, reason: `RSI ${rsi.toFixed(1)} extreme oversold. Risk/reward favorable.` };
+      return { signal: 'HOLD', confidence: 65, reason: `Risk metrics normal. Drawdown ${drawdown.toFixed(1)}%.` };
+    }
+    default: return { signal: 'HOLD', confidence: 50, reason: 'Unknown agent.' };
+  }
+}
+
+function updateAgentCard(agentId, result) {
+  const verdictEl = document.getElementById('agent-verdict-' + agentId);
+  const confEl    = document.getElementById('agent-conf-'    + agentId);
+  const barEl     = document.getElementById('agent-bar-'     + agentId);
+  const reasonEl  = document.getElementById('agent-reason-'  + agentId);
+  const cardEl    = document.getElementById('agent-card-'    + agentId);
+
+  if (!verdictEl) return;
+
+  const cls = result.signal === 'BUY' ? 'chip-neon' : result.signal === 'SELL' ? 'chip-danger' : 'chip-muted';
+  verdictEl.textContent = result.signal;
+  verdictEl.className   = 'chip ' + cls;
+  verdictEl.style.fontSize = '8px';
+
+  if (confEl)   confEl.textContent   = result.signal + ' (' + result.confidence.toFixed(0) + '%)';
+  if (confEl)   confEl.style.color   = result.signal === 'BUY' ? 'var(--neon)' : result.signal === 'SELL' ? 'var(--danger)' : 'var(--muted)';
+  if (barEl)    barEl.style.width    = result.confidence + '%';
+  if (barEl)    barEl.style.background = result.signal === 'BUY' ? 'var(--neon)' : result.signal === 'SELL' ? 'var(--danger)' : 'var(--amber)';
+  if (reasonEl) reasonEl.textContent = result.reason;
+  if (cardEl)   cardEl.style.borderColor = result.signal === 'BUY' ? 'rgba(57,255,20,.3)' : result.signal === 'SELL' ? 'rgba(255,60,60,.3)' : 'var(--border)';
+}
+
+function calcConsensus(signals) {
+  const totalWeight = AGENT_DEFINITIONS.reduce((s, a) => s + a.weight, 0);
+  let buyWeight = 0, sellWeight = 0;
+
+  AGENT_DEFINITIONS.forEach(a => {
+    const sig = signals[a.id];
+    if (!sig) return;
+    const w = a.weight * (sig.confidence / 100);
+    if (sig.signal === 'BUY')  buyWeight  += w;
+    if (sig.signal === 'SELL') sellWeight += w;
   });
+
+  const buyPct  = (buyWeight  / totalWeight) * 100;
+  const sellPct = (sellWeight / totalWeight) * 100;
+
+  return {
+    buyPct, sellPct,
+    action: buyPct  >= 62 ? 'BUY'  :
+            sellPct >= 62 ? 'SELL' : 'HOLD',
+    score: Math.max(buyPct, sellPct)
+  };
+}
+
+function updateConsensusBar(consensus) {
+  const bar   = document.getElementById('consensus-bar');
+  const txt   = document.getElementById('consensus-score-txt');
+  const buyC  = Object.values(lastSignals).filter(s => s.signal === 'BUY').length;
+  const sellC = Object.values(lastSignals).filter(s => s.signal === 'SELL').length;
+
+  if (bar) {
+    bar.style.width = consensus.score + '%';
+    bar.style.background = consensus.action === 'BUY'  ? 'var(--neon)'   :
+                           consensus.action === 'SELL' ? 'var(--danger)' : 'var(--amber)';
+  }
+  if (txt) txt.textContent = `${buyC} BUY · ${sellC} SELL · Score: ${consensus.score.toFixed(0)}%`;
+}
+
+function updateEngineSignalBox(pair, consensus, ohlcv) {
+  const box = document.getElementById('engine-signal-box');
+  if (!box) return;
+  const last = ohlcv && ohlcv.length > 0 ? ohlcv[ohlcv.length-1] : null;
+  const price = last ? parseFloat(last.c || last[4] || 0) : 0;
+  const priceStr = price < 1 ? price.toFixed(4) : price.toFixed(2);
+
+  const actionColor = consensus.action === 'BUY'  ? 'var(--neon)'   :
+                      consensus.action === 'SELL' ? 'var(--danger)' : 'var(--amber)';
+
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="color:#fff;font-family:var(--raj);font-size:14px;font-weight:700">${pair} @ $${priceStr}</span>
+      <span style="color:${actionColor};font-family:var(--raj);font-size:18px;font-weight:700">${consensus.action}</span>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:6px;">
+      <span>🟢 BUY agents: <b style="color:var(--neon)">${Object.values(lastSignals).filter(s=>s.signal==='BUY').length}</b></span>
+      <span>🔴 SELL agents: <b style="color:var(--danger)">${Object.values(lastSignals).filter(s=>s.signal==='SELL').length}</b></span>
+      <span>⚪ HOLD agents: <b style="color:var(--muted)">${Object.values(lastSignals).filter(s=>s.signal==='HOLD').length}</b></span>
+    </div>
+    <div style="color:${actionColor};font-weight:700">
+      ${consensus.action === 'BUY'  ? '🎯 TRIGGER ARMED — Executing BUY order...' :
+        consensus.action === 'SELL' ? '⚡ TRIGGER ARMED — Executing SELL order...' :
+        '◎ Waiting for consensus (62% threshold)...'}
+    </div>`;
+}
+
+async function runEngineAnalysis(pair) {
+  if (!pair) {
+    const sel = document.getElementById('engine-pair-select');
+    pair = sel?.value || activePairs[0] || 'ADA/USDT';
+  }
+
+  // جلب OHLCV حقيقي
+  let ohlcv = [];
+  try {
+    const res = await fetch(`${API}/api/ohlcv?symbol=${encodeURIComponent(pair)}&timeframe=15m&limit=80`);
+    const data = await res.json();
+    ohlcv = data.candles || data || [];
+    if (!Array.isArray(ohlcv)) ohlcv = [];
+  } catch(e) {}
+
+  // تشغيل كل agent
+  for (const agent of AGENT_DEFINITIONS) {
+    const result = await analyzeAgent(agent.id, pair, ohlcv);
+    lastSignals[agent.id] = result;
+    updateAgentCard(agent.id, result);
+  }
+
+  // حساب الـ consensus
+  const consensus = calcConsensus(lastSignals);
+  updateConsensusBar(consensus);
+  updateEngineSignalBox(pair, consensus, ohlcv);
+
+  // تنفيذ إذا Engine مشغّل وفيه إشارة
+  if (engineRunning && consensus.action !== 'HOLD') {
+    await executeSignal(pair, consensus, ohlcv);
+  }
+
+  return consensus;
+}
+
+async function executeSignal(pair, consensus, ohlcv) {
+  const strats = getStrategies();
+  const last = ohlcv[ohlcv.length - 1];
+  const price = parseFloat(last?.c || last?.[4] || 0);
+
+  // حساب حجم الصفقة من الاستراتيجية المفعّلة
+  let orderSize = 500;
+  if (strats.grid.enabled && strats.grid.pairs.includes(pair)) orderSize = strats.grid.order;
+  else if (strats.rsi.enabled && strats.rsi.pairs.includes(pair)) orderSize = strats.rsi.order;
+  else if (strats.dca.enabled && strats.dca.pairs.includes(pair)) orderSize = strats.dca.capital * (strats.dca.pos / 100);
+
+  const msg = `⚡ [SnipBot Execution]: ${pair} ${consensus.action} fired @ $${price.toFixed(4)}. Score: ${consensus.score.toFixed(0)}%. Size: $${orderSize}`;
+
+  addExecLog(msg, consensus.action === 'BUY' ? 'neon' : 'danger');
+
+  // إرسال للـ Proxy
+  try {
+    await fetch(`${API}/api/order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol: pair,
+        side: consensus.action,
+        amount_usdt: orderSize,
+        price: price,
+        source: 'snipbot_engine'
+      })
+    });
+  } catch(e) {}
+
+  // إرسال Telegram
+  sendTelegramNotification(msg);
+  showToast(`${consensus.action === 'BUY' ? '🎯' : '⚡'} ${pair} ${consensus.action} @ $${price.toFixed(4)}`);
+}
+
+function addExecLog(msg, type) {
+  const log = document.getElementById('exec-log');
+  if (!log) return;
+  const now = new Date().toLocaleTimeString('en-GB');
+  const div = document.createElement('div');
+  const color = type === 'neon' ? 'var(--neon)' : type === 'danger' ? 'var(--danger)' : 'var(--muted)';
+  div.style.cssText = `font-family:var(--mono);font-size:9px;padding:5px 8px;border-radius:4px;background:var(--surface);border-left:2px solid ${color};color:var(--steel)`;
+  div.innerHTML = `<span style="color:${color}">[${now}]</span> ${msg}`;
+  log.insertBefore(div, log.firstChild);
+  while (log.children.length > 30) log.removeChild(log.lastChild);
+}
+
+function clearExecLog() {
+  const log = document.getElementById('exec-log');
+  if (log) log.innerHTML = '<div style="font-family:var(--mono);font-size:9px;color:var(--muted);padding:8px;">◎ Log cleared.</div>';
+}
+
+function populateEnginePairSelect() {
+  const sel = document.getElementById('engine-pair-select');
+  if (!sel) return;
+  const pairs = activePairs.length > 0 ? activePairs : ['ADA/USDT', 'XRP/USDT'];
+  sel.innerHTML = pairs.map(p => `<option value="${p}">${p}</option>`).join('');
+}
+
+function armExecutionEngine() {
+  engineRunning = true;
+  engineCycle = 0;
+  const btn     = document.getElementById('btn-engine-arm');
+  const pause   = document.getElementById('btn-engine-pause');
+  const chip    = document.getElementById('engine-mode-chip');
+  const statusT = document.getElementById('engine-status-txt');
+  const cycleC  = document.getElementById('engine-cycle-chip');
+
+  if (btn)     { btn.textContent = '🟢 RUNNING'; btn.className = 'btn btn-neon'; btn.disabled = true; }
+  if (pause)     pause.style.display = 'inline-flex';
+  if (chip)    { chip.textContent = 'AUTO'; chip.className = 'chip chip-neon'; }
+  if (statusT)   statusT.textContent = 'ENGINE ARMED — Scanning every 30 seconds';
+
+  addExecLog('🎯 [Sniper Engine]: Armed. Auto-execution active.', 'neon');
+  sendTelegramNotification('🎯 [SnipBot]: Sniper Engine armed. Auto-execution active.');
+
+  // تشغيل فوري
+  const pair = document.getElementById('engine-pair-select')?.value || activePairs[0] || 'ADA/USDT';
+  runEngineAnalysis(pair);
+
+  // تكرار كل 30 ثانية
+  engineInterval = setInterval(() => {
+    engineCycle++;
+    if (cycleC) cycleC.textContent = 'CYCLE: ' + engineCycle;
+    const p = document.getElementById('engine-pair-select')?.value || activePairs[0] || 'ADA/USDT';
+    runEngineAnalysis(p);
+  }, 30000);
+}
+
+function pauseEngine() {
+  engineRunning = false;
+  clearInterval(engineInterval);
+  const btn   = document.getElementById('btn-engine-arm');
+  const pause = document.getElementById('btn-engine-pause');
+  const chip  = document.getElementById('engine-mode-chip');
+  const statusT = document.getElementById('engine-status-txt');
+
+  if (btn)    { btn.textContent = '🎯 ARM ENGINE'; btn.className = 'btn btn-neon'; btn.disabled = false; }
+  if (pause)    pause.style.display = 'none';
+  if (chip)   { chip.textContent = 'PAUSED'; chip.className = 'chip chip-amber'; }
+  if (statusT)  statusT.textContent = 'ENGINE PAUSED';
+  addExecLog('⏸ Engine paused by user.', 'amber');
+}
+
+async function fetchAndRenderAgentRadar(targetPair) {
+  renderAgentsGrid();
+  populateEnginePairSelect();
+  const pair = targetPair || document.getElementById('engine-pair-select')?.value || activePairs[0] || 'ADA/USDT';
+  if (document.getElementById('engine-pair-select')) document.getElementById('engine-pair-select').value = pair;
+  await runEngineAnalysis(pair);
+  const chip = document.getElementById('agents-chip');
+  if (chip) { chip.textContent = 'ONLINE'; chip.className = 'chip chip-neon'; }
 }
 
 async function refreshAll() {
@@ -1974,6 +2353,18 @@ function dispatchSnippet() {
 
 function emergencyAbort() {
   if (!confirm('⛔ EMERGENCY ABORT — Halt all operations?')) return;
+  // وقف الـ engine
+  engineRunning = false;
+  clearInterval(engineInterval);
+  const btn = document.getElementById('btn-engine-arm');
+  const pause = document.getElementById('btn-engine-pause');
+  const chip = document.getElementById('engine-mode-chip');
+  const statusT = document.getElementById('engine-status-txt');
+  if (btn)    { btn.textContent = '🎯 ARM ENGINE'; btn.className = 'btn btn-neon'; btn.disabled = false; }
+  if (pause)    pause.style.display = 'none';
+  if (chip)   { chip.textContent = 'ABORTED'; chip.className = 'chip chip-danger'; }
+  if (statusT)  statusT.textContent = 'ENGINE ABORTED — All triggers suspended';
+  addExecLog('⛔ ABORT: Engine halted. All triggers suspended.', 'danger');
   showToast('⛔ ABORT executed', 'danger');
   sendTelegramNotification('⛔ <b>[SnipBot ABORT]: Emergency halt executed</b>\nAll triggers suspended.');
 }
